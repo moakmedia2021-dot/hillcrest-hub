@@ -169,6 +169,15 @@ create policy "write event_tasks" on event_tasks for all
 -- Enable realtime on the tables the UI subscribes to.
 alter publication supabase_realtime add table messages, tasks, events, event_tasks;
 
+-- ── Starter channels ─────────────────────────────────────
+-- So chat works immediately. everyone=true means visible to all signed-in users.
+-- (Tasks and events start empty — your team creates those in the app.)
+insert into channels (name, kind, description, everyone) values
+  ('Announcements', 'announcement', 'Church-wide announcements from leadership.', true),
+  ('Creative Team', 'team',        'Video, photo, social, and design.',         true),
+  ('Social Media',  'department',  'Planning and scheduling posts.',            true),
+  ('Worship',       'department',  'Sunday sets and rehearsals.',               true);
+
 -- ── First admin ──────────────────────────────────────────
--- After you sign up your own account, promote yourself:
+-- After you sign up your own account IN THE APP, promote yourself here:
 --   update profiles set role = 'admin' where email = 'you@example.com';
