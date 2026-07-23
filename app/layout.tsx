@@ -11,6 +11,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://hillcrest-hub.vercel.app"),
   title: "Hillcrest Hub — Team Workspace",
   description:
     "Chat, production scheduling, and team coordination for the Hillcrest creative team and volunteers.",
