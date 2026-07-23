@@ -68,8 +68,8 @@ declare norm text;
 begin
   if new.body is null or new.body = '' then return new; end if;
   norm := lower(new.body);
-  -- collapse common leetspeak substitutions
-  norm := translate(norm, '0134$@578', 'oleasatb');
+  -- collapse common leetspeak substitutions (from/to must align 1:1)
+  norm := translate(norm, '0134578$@', 'oieastbsa');
   -- keep only letters and single spaces so word boundaries survive
   norm := regexp_replace(norm, '[^a-z ]', '', 'g');
   norm := ' ' || regexp_replace(norm, '\s+', ' ', 'g') || ' ';
