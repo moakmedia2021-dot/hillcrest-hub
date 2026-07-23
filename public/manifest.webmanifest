@@ -1,0 +1,17 @@
+{
+  "name": "Hillcrest Hub",
+  "short_name": "Hillcrest Hub",
+  "description": "Team workspace for the Hillcrest creative team and volunteers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12a6db",
+  "theme_color": "#12a6db",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
