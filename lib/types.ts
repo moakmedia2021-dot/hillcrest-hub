@@ -65,6 +65,7 @@ export interface Channel {
   kind: ChannelKind;
   memberIds: string[]; // who can see it ("*" convention handled in store)
   description?: string;
+  department?: string; // if set, everyone in this department can see it
 }
 
 export interface Message {

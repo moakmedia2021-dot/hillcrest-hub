@@ -99,8 +99,11 @@ interface StoreValue {
     name: string;
     kind: string;
     memberIds: string[];
+    department?: string;
   }) => Promise<string | undefined>;
   clearChat: (channelId: string) => void;
+  addChannelMember: (channelId: string, memberId: string) => void;
+  removeChannelMember: (channelId: string, memberId: string) => void;
   // events
   createEvent: (input: {
     title: string;
@@ -298,6 +301,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData((d) => ({
           ...d,
           messages: d.messages.filter((m) => m.channelId !== channelId),
+        }));
+      },
+      addChannelMember: (channelId, memberId) => {
+        const sb = live();
+        if (sb) fire(writes.addChannelMember(sb, channelId, memberId));
+        setData((d) => ({
+          ...d,
+          channels: d.channels.map((c) =>
+            c.id === channelId && !c.memberIds.includes(memberId)
+              ? { ...c, memberIds: [...c.memberIds, memberId] }
+              : c
+          ),
+        }));
+      },
+      removeChannelMember: (channelId, memberId) => {
+        const sb = live();
+        if (sb) fire(writes.removeChannelMember(sb, channelId, memberId));
+        setData((d) => ({
+          ...d,
+          channels: d.channels.map((c) =>
+            c.id === channelId
+              ? { ...c, memberIds: c.memberIds.filter((m) => m !== memberId) }
+              : c
+          ),
         }));
       },
       createEvent: (input) => {

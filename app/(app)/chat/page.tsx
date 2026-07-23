@@ -27,7 +27,10 @@ import {
   Loader2,
   Check,
   Eraser,
+  Settings,
+  UserPlus,
 } from "lucide-react";
+import { allDepartments } from "@/lib/departments";
 import type { Channel } from "@/lib/types";
 
 const LASTREAD_KEY = "hillcrest-hub:lastread:v1";
@@ -59,6 +62,7 @@ export default function ChatPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [sortOpen, setSortOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [imgBusy, setImgBusy] = useState(false);
   const [lastRead, setLastRead] = useState<Record<string, string>>({});
@@ -105,6 +109,7 @@ export default function ChatPage() {
       (c) =>
         c.memberIds.includes("*") ||
         c.memberIds.includes(user.id) ||
+        (c.department != null && c.department === user.department) ||
         isAdmin
     );
     if (sortMode === "dms") list = list.filter((c) => c.kind === "direct");
@@ -360,6 +365,15 @@ export default function ChatPage() {
               </p>
             )}
           </div>
+          {isAdmin && !active.memberIds.includes("*") && (
+            <button
+              onClick={() => setSettingsFor(active.id)}
+              className="rounded-lg border border-line p-2 text-ink-soft hover:bg-surface-2"
+              title="Chat settings — add or remove people"
+            >
+              <Settings size={15} />
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => {
@@ -535,6 +549,134 @@ export default function ChatPage() {
       {creating && (
         <NewChatModal onClose={() => setCreating(false)} onOpen={setActiveId} />
       )}
+      {settingsFor && (
+        <ChatSettingsModal
+          channelId={settingsFor}
+          onClose={() => setSettingsFor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ChatSettingsModal({
+  channelId,
+  onClose,
+}: {
+  channelId: string;
+  onClose: () => void;
+}) {
+  const { user } = useAuth();
+  const { data, addChannelMember, removeChannelMember } = useStore();
+  const channel = data.channels.find((c) => c.id === channelId);
+  if (!channel) return null;
+
+  const members = data.members.filter((m) => channel.memberIds.includes(m.id));
+  const nonMembers = data.members.filter(
+    (m) => !channel.memberIds.includes(m.id)
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col rounded-t-2xl bg-surface sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-line p-5">
+          <div>
+            <h2 className="text-lg font-bold text-ink">{channel.name}</h2>
+            <p className="text-xs text-ink-soft">
+              Add or remove who can see this chat.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-ink-soft hover:bg-surface-2"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-5 overflow-y-auto p-5">
+          {channel.department && (
+            <p className="rounded-lg bg-brand-soft/50 px-3 py-2 text-xs text-brand-dark">
+              Everyone in the <b>{channel.department}</b> department already has
+              access automatically.
+            </p>
+          )}
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              In this chat ({members.length})
+            </p>
+            <div className="space-y-1">
+              {members.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 rounded-xl border border-line px-3 py-2"
+                >
+                  <Avatar member={m} size={32} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-ink">
+                      {m.name}
+                    </div>
+                    <div className="truncate text-xs text-ink-soft">
+                      {m.department}
+                    </div>
+                  </div>
+                  {m.id !== user?.id && (
+                    <button
+                      onClick={() => removeChannelMember(channelId, m.id)}
+                      className="rounded-lg p-1.5 text-ink-soft hover:bg-red-50 hover:text-danger"
+                      title="Remove"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {nonMembers.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                Add people
+              </p>
+              <div className="space-y-1">
+                {nonMembers.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 rounded-xl border border-line px-3 py-2"
+                  >
+                    <Avatar member={m} size={32} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-ink">
+                        {m.name}
+                      </div>
+                      <div className="truncate text-xs text-ink-soft">
+                        {m.department}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => addChannelMember(channelId, m.id)}
+                      className="flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1.5 text-xs font-semibold text-brand-dark hover:bg-brand hover:text-white"
+                    >
+                      <UserPlus size={14} /> Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-line p-4">
+          <button
+            onClick={onClose}
+            className="w-full rounded-xl bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+          >
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -549,6 +691,7 @@ function NewChatModal({
   const { user } = useAuth();
   const { data, createChat } = useStore();
   const [name, setName] = useState("");
+  const [department, setDepartment] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -561,19 +704,23 @@ function NewChatModal({
       return n;
     });
 
-  const isDm = selected.size === 1 && !name.trim();
-  const canCreate = selected.size >= 1 && (name.trim() !== "" || selected.size === 1);
+  const isDept = department !== "";
+  const isDm = !isDept && selected.size === 1 && !name.trim();
+  const canCreate = isDept || selected.size >= 1;
 
   const create = async () => {
     if (!user || !canCreate) return;
     setBusy(true);
     const memberIds = [user.id, ...Array.from(selected)];
     const other = data.members.find((m) => selected.has(m.id));
-    const chatName = name.trim() || (isDm && other ? other.name : "New chat");
+    const chatName =
+      name.trim() ||
+      (isDept ? `${department} Team` : isDm && other ? other.name : "New chat");
     const id = await createChat({
       name: chatName,
-      kind: isDm ? "direct" : "team",
+      kind: isDept ? "department" : isDm ? "direct" : "team",
       memberIds,
+      department: department || undefined,
     });
     setBusy(false);
     onClose();
@@ -612,8 +759,32 @@ function NewChatModal({
           </div>
 
           <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-soft">
+              Give a whole department access (optional)
+            </label>
+            <select
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-brand"
+            >
+              <option value="">None — just the people I pick</option>
+              {allDepartments(data.members).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            {isDept && (
+              <p className="mt-1 text-xs text-ink-soft">
+                Everyone in {department} auto-joins. You can still add extras
+                below.
+              </p>
+            )}
+          </div>
+
+          <div>
             <label className="mb-2 block text-xs font-semibold text-ink-soft">
-              Add people ({selected.size} selected)
+              Add specific people ({selected.size} selected)
             </label>
             <div className="space-y-1">
               {others.map((m) => {

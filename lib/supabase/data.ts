@@ -73,6 +73,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     name: c.name,
     kind: c.kind,
     description: c.description ?? undefined,
+    department: c.department ?? undefined,
     memberIds: c.everyone ? ["*"] : memberIdsByChannel.get(c.id) ?? [],
   }));
 
@@ -166,11 +167,21 @@ export const writes = {
 
   createChannel: async (
     sb: SupabaseClient,
-    input: { name: string; kind: string; memberIds: string[] }
+    input: {
+      name: string;
+      kind: string;
+      memberIds: string[];
+      department?: string;
+    }
   ): Promise<{ id?: string; error?: string }> => {
     const { data, error } = await sb
       .from("channels")
-      .insert({ name: input.name, kind: input.kind, everyone: false })
+      .insert({
+        name: input.name,
+        kind: input.kind,
+        everyone: false,
+        department: input.department ?? null,
+      })
       .select("id")
       .single();
     if (error || !data) return { error: error?.message ?? "create failed" };
@@ -184,6 +195,18 @@ export const writes = {
 
   clearChannel: (sb: SupabaseClient, cid: string) =>
     sb.rpc("clear_channel", { cid }),
+
+  addChannelMember: (sb: SupabaseClient, cid: string, memberId: string) =>
+    sb
+      .from("channel_members")
+      .upsert({ channel_id: cid, member_id: memberId }),
+
+  removeChannelMember: (sb: SupabaseClient, cid: string, memberId: string) =>
+    sb
+      .from("channel_members")
+      .delete()
+      .eq("channel_id", cid)
+      .eq("member_id", memberId),
 
   addTask: (
     sb: SupabaseClient,
