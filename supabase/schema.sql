@@ -23,8 +23,9 @@ create table profiles (
 
 -- Helper: current user's role (used by policies below).
 create or replace function current_role_of()
-returns user_role language sql stable security definer as $$
-  select role from profiles where id = auth.uid()
+returns user_role language sql stable security definer
+set search_path = public as $$
+  select role from public.profiles where id = auth.uid()
 $$;
 
 create or replace function has_perm(min_admin boolean)
@@ -33,10 +34,16 @@ returns boolean language sql stable as $$
 $$;
 
 -- Auto-create a profile whenever someone signs up.
+-- `set search_path = public` is required so this security-definer function can
+-- resolve the profiles table; without it, signup fails with a DB error.
 create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
-  insert into profiles (id, name, email)
+  insert into public.profiles (id, name, email)
   values (new.id, coalesce(new.raw_user_meta_data->>'name', new.email), new.email);
   return new;
 end;
