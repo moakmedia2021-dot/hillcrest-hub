@@ -69,7 +69,12 @@ function fire(p: PromiseLike<unknown>) {
 interface StoreValue {
   data: AppData;
   // messages
-  sendMessage: (channelId: string, authorId: string, body: string) => void;
+  sendMessage: (
+    channelId: string,
+    authorId: string,
+    body: string,
+    imageUrl?: string
+  ) => void;
   deleteMessage: (messageId: string, byId: string) => void;
   // tasks
   addTask: (t: Omit<ProductionTask, "id" | "createdAt">) => void;
@@ -89,6 +94,12 @@ interface StoreValue {
   ) => void;
   // channels
   addChannel: (c: Omit<Channel, "id">) => void;
+  createChat: (input: {
+    name: string;
+    kind: string;
+    memberIds: string[];
+  }) => Promise<string | undefined>;
+  clearChat: (channelId: string) => void;
   // events
   createEvent: (input: {
     title: string;
@@ -148,7 +159,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoreValue>(
     () => ({
       data,
-      sendMessage: (channelId, authorId, body) => {
+      sendMessage: (channelId, authorId, body, imageUrl) => {
         // Optimistic in both modes so the sender sees their message instantly.
         // In Supabase mode, realtime + the next loadAll reconcile this temp row
         // with the canonical one (same content, real id) — no duplicate.
@@ -157,11 +168,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           channelId,
           authorId,
           body: body.trim(),
+          imageUrl,
           createdAt: new Date().toISOString(),
         };
         setData((d) => ({ ...d, messages: [...d.messages, msg] }));
         const sb = live();
-        if (sb) fire(writes.sendMessage(sb, channelId, authorId, body.trim()));
+        if (sb)
+          fire(writes.sendMessage(sb, channelId, authorId, body.trim(), imageUrl));
       },
       deleteMessage: (messageId, byId) => {
         const sb = live();
@@ -250,6 +263,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           channels: [...d.channels, { ...c, id: uid() }],
         })),
+      createChat: async (input) => {
+        const sb = live();
+        if (sb) {
+          const res = await writes.createChannel(sb, input);
+          // Channels aren't optimistic; pull the real channel + membership.
+          loadAll(sb).then(setData).catch(() => {});
+          return res.id;
+        }
+        const id = uid();
+        setData((d) => ({
+          ...d,
+          channels: [
+            ...d.channels,
+            { id, name: input.name, kind: input.kind as Channel["kind"], memberIds: input.memberIds },
+          ],
+        }));
+        return id;
+      },
+      clearChat: (channelId) => {
+        const sb = live();
+        if (sb) fire(writes.clearChannel(sb, channelId));
+        setData((d) => ({
+          ...d,
+          messages: d.messages.filter((m) => m.channelId !== channelId),
+        }));
+      },
       createEvent: (input) => {
         const id = uid();
         // Turn template items into event tasks, computing due dates from the

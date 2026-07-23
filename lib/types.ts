@@ -73,6 +73,7 @@ export interface Message {
   channelId: string;
   authorId: string;
   body: string;
+  imageUrl?: string; // attached image
   createdAt: string; // ISO
   pinned?: boolean;
   deleted?: boolean;

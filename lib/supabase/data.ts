@@ -81,6 +81,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     channelId: m.channel_id,
     authorId: m.author_id,
     body: m.body,
+    imageUrl: m.image_url ?? undefined,
     pinned: m.pinned ?? false,
     createdAt: m.created_at,
     deleted: m.deleted ?? false,
@@ -139,6 +140,8 @@ export function subscribe(sb: SupabaseClient, onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "events" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "event_tasks" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "channels" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "channel_members" }, onChange)
     .subscribe();
   return () => {
     sb.removeChannel(channel);
@@ -147,8 +150,40 @@ export function subscribe(sb: SupabaseClient, onChange: () => void) {
 
 // ── Writes ───────────────────────────────────────────────
 export const writes = {
-  sendMessage: (sb: SupabaseClient, channelId: string, authorId: string, body: string) =>
-    sb.from("messages").insert({ channel_id: channelId, author_id: authorId, body }),
+  sendMessage: (
+    sb: SupabaseClient,
+    channelId: string,
+    authorId: string,
+    body: string,
+    imageUrl?: string
+  ) =>
+    sb.from("messages").insert({
+      channel_id: channelId,
+      author_id: authorId,
+      body,
+      image_url: imageUrl ?? null,
+    }),
+
+  createChannel: async (
+    sb: SupabaseClient,
+    input: { name: string; kind: string; memberIds: string[] }
+  ): Promise<{ id?: string; error?: string }> => {
+    const { data, error } = await sb
+      .from("channels")
+      .insert({ name: input.name, kind: input.kind, everyone: false })
+      .select("id")
+      .single();
+    if (error || !data) return { error: error?.message ?? "create failed" };
+    if (input.memberIds.length) {
+      await sb
+        .from("channel_members")
+        .insert(input.memberIds.map((m) => ({ channel_id: data.id, member_id: m })));
+    }
+    return { id: data.id };
+  },
+
+  clearChannel: (sb: SupabaseClient, cid: string) =>
+    sb.rpc("clear_channel", { cid }),
 
   addTask: (
     sb: SupabaseClient,
@@ -239,6 +274,23 @@ export async function uploadAvatar(
   const up = await sb.storage
     .from("avatars")
     .upload(path, file, { upsert: true, contentType: file.type });
+  if (up.error) return { error: up.error.message };
+  const { data } = sb.storage.from("avatars").getPublicUrl(path);
+  return { url: data.publicUrl };
+}
+
+// Chat images share the (public) avatars bucket under a chat/ prefix, so no
+// extra bucket setup is needed.
+export async function uploadChatImage(
+  sb: SupabaseClient,
+  userId: string,
+  file: File
+): Promise<{ url?: string; error?: string }> {
+  const ext = file.name.split(".").pop() || "png";
+  const path = `chat/${userId}/${Date.now()}.${ext}`;
+  const up = await sb.storage
+    .from("avatars")
+    .upload(path, file, { contentType: file.type });
   if (up.error) return { error: up.error.message };
   const { data } = sb.storage.from("avatars").getPublicUrl(path);
   return { url: data.publicUrl };
