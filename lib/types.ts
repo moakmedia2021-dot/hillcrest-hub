@@ -34,7 +34,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "manage_schedule",
     "manage_events",
     "manage_channels",
-    "view_admin",
   ],
   lead: ["manage_schedule", "manage_events"],
   volunteer: [],

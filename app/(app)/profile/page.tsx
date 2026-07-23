@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Avatar, RoleBadge } from "@/components/Avatar";
 import { getSupabase } from "@/lib/supabase/client";
 import { uploadAvatar } from "@/lib/supabase/data";
-import { Camera, Check, Loader2, Mail } from "lucide-react";
+import { Camera, Check, Loader2, Mail, Lock } from "lucide-react";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -17,7 +17,6 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [title, setTitle] = useState(user?.title ?? "");
-  const [department, setDepartment] = useState(user?.department ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl);
@@ -55,7 +54,6 @@ export default function ProfilePage() {
       name: name.trim() || user.name,
       username: username.trim() || undefined,
       title: title.trim() || undefined,
-      department: department.trim() || user.department,
       phone: phone.trim() || undefined,
       bio: bio.trim() || undefined,
     });
@@ -155,12 +153,11 @@ export default function ProfilePage() {
               <label className="mb-1 block text-xs font-semibold text-ink-soft">
                 Department
               </label>
-              <input
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                placeholder="e.g. Creative"
-                className={field}
-              />
+              <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm text-ink-soft">
+                <Lock size={13} />
+                {user.department || "Unassigned"}
+                <span className="ml-auto text-xs">set by an admin</span>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-ink-soft">

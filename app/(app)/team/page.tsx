@@ -1,15 +1,23 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Avatar, RoleBadge } from "@/components/Avatar";
-import { Mail, Phone } from "lucide-react";
+import { Mail, Phone, Lock } from "lucide-react";
 
 export default function TeamPage() {
   const { data } = useStore();
+  const { user } = useAuth();
+
+  // Team Leads and up see everyone; volunteers see only their own department.
+  const seeAll = !!user && user.role !== "volunteer";
+  const visible = seeAll
+    ? data.members
+    : data.members.filter((m) => m.department === user?.department);
 
   // Group by department
-  const byDept = data.members.reduce<Record<string, typeof data.members>>(
+  const byDept = visible.reduce<Record<string, typeof data.members>>(
     (acc, m) => {
       (acc[m.department] ??= []).push(m);
       return acc;
@@ -22,10 +30,20 @@ export default function TeamPage() {
       <PageHeader
         eyebrow="People"
         title="Team Directory"
-        subtitle="Everyone serving across Hillcrest, by department."
+        subtitle={
+          seeAll
+            ? "Everyone serving across Hillcrest, by department."
+            : "The people serving in your department."
+        }
       />
 
       <div className="space-y-8 p-5 sm:p-8">
+        {!seeAll && (
+          <p className="flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-2.5 text-sm text-ink-soft">
+            <Lock size={14} /> You&apos;re seeing your own department. Team Leads
+            and up can view all departments.
+          </p>
+        )}
         {Object.entries(byDept).map(([dept, members]) => (
           <section key={dept}>
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-ink-soft">

@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Avatar } from "@/components/Avatar";
+import { DepartmentSelect } from "@/components/DepartmentSelect";
 import {
   ROLE_LABEL,
   ROLE_PERMISSIONS,
@@ -29,7 +30,7 @@ const ALL_PERMS = Object.keys(PERM_LABEL) as Permission[];
 
 export default function AdminPage() {
   const { user, can } = useAuth();
-  const { data, setMemberRole, reset } = useStore();
+  const { data, setMemberRole, setMemberDepartment, reset } = useStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -64,36 +65,46 @@ export default function AdminPage() {
             <h2 className="font-bold text-ink">Team members</h2>
             <p className="text-xs text-ink-soft">
               {canManage
-                ? "Change a person's role to adjust their access instantly."
+                ? "Set each person's department and role. Pick “+ Add new department” to create one."
                 : "You can view roles. Only Admins can change them."}
             </p>
           </div>
           <ul className="divide-y divide-line">
             {data.members.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-5 py-3">
+              <li
+                key={m.id}
+                className="flex flex-wrap items-center gap-3 px-5 py-3"
+              >
                 <Avatar member={m} size={38} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold text-ink">
                     {m.name}
                   </div>
                   <div className="truncate text-xs text-ink-soft">
-                    {m.title} · {m.department}
+                    {m.title ?? m.role} · {m.department}
                   </div>
                 </div>
                 {canManage ? (
-                  <select
-                    value={m.role}
-                    onChange={(e) =>
-                      setMemberRole(m.id, e.target.value as Role)
-                    }
-                    className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-brand"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <DepartmentSelect
+                      value={m.department}
+                      onChange={(dept) => setMemberDepartment(m.id, dept)}
+                      className="w-40 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm outline-none focus:border-brand"
+                    />
+                    <select
+                      value={m.role}
+                      onChange={(e) =>
+                        setMemberRole(m.id, e.target.value as Role)
+                      }
+                      className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-brand"
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 ) : (
                   <span className="text-sm font-semibold text-ink-soft">
                     {ROLE_LABEL[m.role]}

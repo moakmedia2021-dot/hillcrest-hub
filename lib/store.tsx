@@ -83,6 +83,7 @@ interface StoreValue {
   deleteTask: (taskId: string) => void;
   // members
   setMemberRole: (memberId: string, role: Member["role"]) => void;
+  setMemberDepartment: (memberId: string, department: string) => void;
   updateProfile: (
     memberId: string,
     patch: Partial<
@@ -234,6 +235,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           members: d.members.map((m) =>
             m.id === memberId ? { ...m, role } : m
+          ),
+        }));
+      },
+      setMemberDepartment: (memberId, department) => {
+        const sb = live();
+        if (sb) fire(writes.updateProfile(sb, memberId, { department }));
+        setData((d) => ({
+          ...d,
+          members: d.members.map((m) =>
+            m.id === memberId ? { ...m, department } : m
           ),
         }));
       },
