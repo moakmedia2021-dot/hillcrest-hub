@@ -27,3 +27,16 @@ $$;
 -- Wire up the example department chats so the right people unlock them.
 update channels set department = 'Creative' where name = 'Creative Team' and department is null;
 update channels set department = 'Worship'  where name = 'Worship'       and department is null;
+
+-- ── Lock: only admins can change a profile's department (DB-enforced) ──
+create or replace function lock_department()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.department is distinct from old.department and current_role_of() <> 'admin' then
+    raise exception 'Only an admin can change a department';
+  end if;
+  return new;
+end; $$;
+drop trigger if exists profiles_dept_lock on profiles;
+create trigger profiles_dept_lock before update on profiles
+  for each row execute function lock_department();
