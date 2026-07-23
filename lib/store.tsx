@@ -53,6 +53,19 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 // local state optimistically and, when live, also persist; realtime reconciles.
 const live = () => (SUPABASE_ENABLED ? getSupabase() : null);
 
+// supabase-js query builders are LAZY: the HTTP request only runs when the
+// builder is awaited/then'd. fire() forces execution and surfaces any error,
+// so fire-and-forget writes actually persist.
+function fire(p: PromiseLike<unknown>) {
+  Promise.resolve(p).then(
+    (r) => {
+      const err = (r as { error?: unknown } | null)?.error;
+      if (err) console.error("[hub write]", err);
+    },
+    (e) => console.error("[hub write]", e)
+  );
+}
+
 interface StoreValue {
   data: AppData;
   // messages
@@ -126,11 +139,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => ({
       data,
       sendMessage: (channelId, authorId, body) => {
-        const sb = live();
-        if (sb) {
-          writes.sendMessage(sb, channelId, authorId, body.trim());
-          return;
-        }
+        // Optimistic in both modes so the sender sees their message instantly.
+        // In Supabase mode, realtime + the next loadAll reconcile this temp row
+        // with the canonical one (same content, real id) — no duplicate.
         const msg: Message = {
           id: uid(),
           channelId,
@@ -139,23 +150,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString(),
         };
         setData((d) => ({ ...d, messages: [...d.messages, msg] }));
+        const sb = live();
+        if (sb) fire(writes.sendMessage(sb, channelId, authorId, body.trim()));
       },
       addTask: (t) => {
-        const sb = live();
-        if (sb) {
-          writes.addTask(sb, t);
-          return;
-        }
         const task: ProductionTask = {
           ...t,
           id: uid(),
           createdAt: new Date().toISOString(),
         };
         setData((d) => ({ ...d, tasks: [task, ...d.tasks] }));
+        const sb = live();
+        if (sb) fire(writes.addTask(sb, t));
       },
       moveTask: (taskId, stage) => {
         const sb = live();
-        if (sb) writes.moveTask(sb, taskId, stage);
+        if (sb) fire(writes.moveTask(sb, taskId, stage));
         setData((d) => ({
           ...d,
           tasks: d.tasks.map((t) => (t.id === taskId ? { ...t, stage } : t)),
@@ -168,7 +178,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       deleteTask: (taskId) => {
         const sb = live();
-        if (sb) writes.deleteTask(sb, taskId);
+        if (sb) fire(writes.deleteTask(sb, taskId));
         setData((d) => ({
           ...d,
           tasks: d.tasks.filter((t) => t.id !== taskId),
@@ -176,7 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       setMemberRole: (memberId, role) => {
         const sb = live();
-        if (sb) writes.setMemberRole(sb, memberId, role);
+        if (sb) fire(writes.setMemberRole(sb, memberId, role));
         setData((d) => ({
           ...d,
           members: d.members.map((m) =>
@@ -218,7 +228,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString(),
         };
         const sb = live();
-        if (sb) writes.createEvent(sb, event);
+        if (sb) fire(writes.createEvent(sb, event));
         setData((d) => ({ ...d, events: [...d.events, event] }));
         return id;
       },
@@ -231,7 +241,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       deleteEvent: (eventId) => {
         const sb = live();
-        if (sb) writes.deleteEvent(sb, eventId);
+        if (sb) fire(writes.deleteEvent(sb, eventId));
         setData((d) => ({
           ...d,
           events: d.events.filter((e) => e.id !== eventId),
@@ -243,7 +253,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const cur = data.events
             .find((e) => e.id === eventId)
             ?.tasks.find((t) => t.id === taskId);
-          if (cur) writes.toggleEventTask(sb, taskId, !cur.done);
+          if (cur) fire(writes.toggleEventTask(sb, taskId, !cur.done));
         }
         setData((d) => ({
           ...d,
@@ -261,7 +271,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       assignEventTask: (eventId, taskId, assigneeId) => {
         const sb = live();
-        if (sb) writes.assignEventTask(sb, taskId, assigneeId);
+        if (sb) fire(writes.assignEventTask(sb, taskId, assigneeId));
         setData((d) => ({
           ...d,
           events: d.events.map((e) =>
