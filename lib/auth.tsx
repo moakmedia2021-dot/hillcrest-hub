@@ -136,6 +136,7 @@ function mapProfile(p: Record<string, unknown>): Member {
     username: (p.username as string) ?? undefined,
     avatarUrl: (p.avatar_url as string) ?? undefined,
     bio: (p.bio as string) ?? undefined,
+    approved: (p.approved as boolean) ?? true,
   };
 }
 

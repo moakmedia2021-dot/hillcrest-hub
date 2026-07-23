@@ -25,6 +25,7 @@ import type {
   TaskStage,
   ChurchEvent,
   EventTemplate,
+  Resource,
 } from "./types";
 import { SUPABASE_ENABLED } from "./supabase/config";
 import { getSupabase } from "./supabase/client";
@@ -93,6 +94,10 @@ interface StoreValue {
       >
     >
   ) => void;
+  approveMember: (memberId: string, approved: boolean) => void;
+  // resources
+  addResource: (r: Omit<Resource, "id" | "createdAt">) => void;
+  deleteResource: (id: string) => void;
   // channels
   addChannel: (c: Omit<Channel, "id">) => void;
   createChat: (input: {
@@ -270,6 +275,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           members: d.members.map((m) =>
             m.id === memberId ? { ...m, ...patch } : m
           ),
+        }));
+      },
+      approveMember: (memberId, approved) => {
+        const sb = live();
+        if (sb) fire(writes.approveMember(sb, memberId, approved));
+        setData((d) => ({
+          ...d,
+          members: d.members.map((m) =>
+            m.id === memberId ? { ...m, approved } : m
+          ),
+        }));
+      },
+      addResource: (r) => {
+        const sb = live();
+        if (sb) {
+          fire(writes.addResource(sb, r));
+        } else {
+          setData((d) => ({
+            ...d,
+            resources: [
+              { ...r, id: uid(), createdAt: new Date().toISOString() },
+              ...d.resources,
+            ],
+          }));
+        }
+      },
+      deleteResource: (id) => {
+        const sb = live();
+        if (sb) fire(writes.deleteResource(sb, id));
+        setData((d) => ({
+          ...d,
+          resources: d.resources.filter((r) => r.id !== id),
         }));
       },
       addChannel: (c) =>

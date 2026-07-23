@@ -55,6 +55,20 @@ export interface Member {
   username?: string;
   avatarUrl?: string; // profile picture; falls back to initials avatar
   bio?: string;
+  approved?: boolean; // false = pending admin approval
+}
+
+export type ResourceKind = "link" | "file" | "video" | "doc" | "note";
+
+export interface Resource {
+  id: string;
+  title: string;
+  description?: string;
+  url?: string;
+  kind: ResourceKind;
+  department?: string; // undefined = everyone
+  createdById?: string;
+  createdAt: string;
 }
 
 export type ChannelKind = "announcement" | "team" | "department" | "direct";
@@ -178,4 +192,5 @@ export interface AppData {
   tasks: ProductionTask[];
   templates: EventTemplate[];
   events: ChurchEvent[];
+  resources: Resource[];
 }

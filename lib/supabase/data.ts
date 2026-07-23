@@ -14,8 +14,10 @@ import type {
   Message,
   ProductionTask,
   ChurchEvent,
+  Resource,
   Role,
   TaskStage,
+  ResourceKind,
 } from "../types";
 import { SEED } from "../seed";
 
@@ -30,6 +32,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     events,
     eventTasks,
     deletions,
+    resources,
   ] = await Promise.all([
     sb.from("profiles").select("*").order("name"),
     sb.from("channels").select("*").order("created_at"),
@@ -40,6 +43,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     sb.from("event_tasks").select("*").order("sort"),
     // Only admins get rows back (RLS); non-admins/older DBs get none.
     sb.from("message_deletions").select("message_id, original_body"),
+    sb.from("resources").select("*").order("created_at", { ascending: false }),
   ]);
 
   // message_id -> original deleted content (admins only)
@@ -59,6 +63,18 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     username: p.username ?? undefined,
     avatarUrl: p.avatar_url ?? undefined,
     bio: p.bio ?? undefined,
+    approved: p.approved ?? true, // pre-migration rows have no column → allow
+  }));
+
+  const resourceList: Resource[] = (resources.data ?? []).map((r) => ({
+    id: r.id,
+    title: r.title,
+    description: r.description ?? undefined,
+    url: r.url ?? undefined,
+    kind: (r.kind as ResourceKind) ?? "link",
+    department: r.department ?? undefined,
+    createdById: r.created_by ?? undefined,
+    createdAt: r.created_at,
   }));
 
   const memberIdsByChannel = new Map<string, string[]>();
@@ -130,6 +146,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     tasks: taskList,
     events: eventList,
     templates: SEED.templates, // static app constants
+    resources: resourceList,
   };
 }
 
@@ -143,6 +160,7 @@ export function subscribe(sb: SupabaseClient, onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "event_tasks" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "channels" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "channel_members" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "resources" }, onChange)
     .subscribe();
   return () => {
     sb.removeChannel(channel);
@@ -207,6 +225,32 @@ export const writes = {
       .delete()
       .eq("channel_id", cid)
       .eq("member_id", memberId),
+
+  approveMember: (sb: SupabaseClient, id: string, approved: boolean) =>
+    sb.from("profiles").update({ approved }).eq("id", id),
+
+  addResource: (
+    sb: SupabaseClient,
+    r: {
+      title: string;
+      description?: string;
+      url?: string;
+      kind: string;
+      department?: string;
+      createdById?: string;
+    }
+  ) =>
+    sb.from("resources").insert({
+      title: r.title,
+      description: r.description ?? null,
+      url: r.url ?? null,
+      kind: r.kind,
+      department: r.department ?? null,
+      created_by: r.createdById ?? null,
+    }),
+
+  deleteResource: (sb: SupabaseClient, id: string) =>
+    sb.from("resources").delete().eq("id", id),
 
   addTask: (
     sb: SupabaseClient,

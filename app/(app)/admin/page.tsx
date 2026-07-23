@@ -30,7 +30,9 @@ const ALL_PERMS = Object.keys(PERM_LABEL) as Permission[];
 
 export default function AdminPage() {
   const { user, can } = useAuth();
-  const { data, setMemberRole, setMemberDepartment, reset } = useStore();
+  const { data, setMemberRole, setMemberDepartment, approveMember, reset } =
+    useStore();
+  const pending = data.members.filter((m) => m.approved === false);
   const router = useRouter();
 
   useEffect(() => {
@@ -59,6 +61,41 @@ export default function AdminPage() {
       />
 
       <div className="space-y-8 p-5 sm:p-8">
+        {/* Pending approvals */}
+        {pending.length > 0 && (
+          <section className="card overflow-hidden ring-2 ring-amber-200">
+            <div className="border-b border-line bg-amber-50 px-5 py-3.5">
+              <h2 className="font-bold text-ink">
+                Pending approvals ({pending.length})
+              </h2>
+              <p className="text-xs text-ink-soft">
+                New sign-ups waiting for you to let them in.
+              </p>
+            </div>
+            <ul className="divide-y divide-line">
+              {pending.map((m) => (
+                <li key={m.id} className="flex items-center gap-3 px-5 py-3">
+                  <Avatar member={m} size={38} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-ink">
+                      {m.name}
+                    </div>
+                    <div className="truncate text-xs text-ink-soft">
+                      {m.email}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => approveMember(m.id, true)}
+                    className="rounded-lg bg-brand px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark"
+                  >
+                    Approve
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Member roles */}
         <section className="card overflow-hidden">
           <div className="border-b border-line px-5 py-3.5">

@@ -10,6 +10,8 @@ import {
   Users,
   Shield,
   CalendarRange,
+  CalendarDays,
+  BookOpen,
   Mail,
   MessageSquareText,
   FolderSync,
@@ -20,12 +22,15 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Avatar, RoleBadge } from "./Avatar";
+import { NotificationBell } from "./NotificationBell";
 
 const MAIN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "Chat & Announcements", icon: MessagesSquare },
   { href: "/schedule", label: "Production Schedule", icon: KanbanSquare },
   { href: "/events", label: "Events", icon: CalendarRange },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/resources", label: "Resources", icon: BookOpen },
   { href: "/planning-center", label: "Planning Center", icon: FolderSync },
   { href: "/team", label: "Team Directory", icon: Users },
 ];
@@ -54,10 +59,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-white font-bold">
           H
         </div>
-        <div className="leading-tight">
+        <div className="flex-1 leading-tight">
           <div className="text-[15px] font-bold text-ink">Hillcrest Hub</div>
           <div className="text-[11px] text-ink-soft">Team Workspace</div>
         </div>
+        <NotificationBell />
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3">
@@ -167,6 +173,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               H
             </div>
             <span className="font-bold text-ink">Hillcrest Hub</span>
+          </div>
+          <div className="ml-auto">
+            <NotificationBell />
           </div>
         </header>
 
