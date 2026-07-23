@@ -99,13 +99,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sb = SUPABASE_ENABLED ? getSupabase() : null;
     if (sb) {
-      let unsub = () => {};
       const refresh = () => loadAll(sb).then(setData).catch(() => {});
-      refresh().then(() => {
-        unsub = subscribe(sb, refresh);
-      });
+      // Realtime: reload when the live tables change.
+      const realtimeUnsub = subscribe(sb, refresh);
+      // Reload whenever auth resolves or changes (initial session, sign in,
+      // sign out) so reads run with the session attached — not as anon.
+      const { data: authSub } = sb.auth.onAuthStateChange(() => refresh());
+      refresh();
       setHydrated(true);
-      return () => unsub();
+      return () => {
+        realtimeUnsub();
+        authSub.subscription.unsubscribe();
+      };
     }
     setData(load());
     setHydrated(true);
