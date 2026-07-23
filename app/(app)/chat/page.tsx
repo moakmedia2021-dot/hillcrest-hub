@@ -13,6 +13,9 @@ import {
   Pin,
   Lock,
   ArrowLeft,
+  Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import type { Channel } from "@/lib/types";
 
@@ -24,11 +27,13 @@ function channelIcon(kind: Channel["kind"]) {
 
 export default function ChatPage() {
   const { user, can } = useAuth();
-  const { data, sendMessage } = useStore();
+  const { data, sendMessage, deleteMessage } = useStore();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [showThreadMobile, setShowThreadMobile] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.role === "admin";
 
   const myChannels = useMemo(
     () => (user ? channelsForMember(data, user.id) : []),
@@ -149,8 +154,11 @@ export default function ChatPage() {
           {messages.map((m) => {
             const who = data.members.find((x) => x.id === m.authorId);
             const mine = m.authorId === user.id;
+            const canDelete = !m.deleted && (mine || isAdmin);
+            const deleter = data.members.find((x) => x.id === m.deletedById);
+            const isRevealed = revealed.has(m.id);
             return (
-              <div key={m.id} className="flex gap-3">
+              <div key={m.id} className="group flex gap-3">
                 {who && <Avatar member={who} size={36} />}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -166,10 +174,58 @@ export default function ChatPage() {
                       {relativeTime(m.createdAt)}
                     </span>
                     {m.pinned && <Pin size={12} className="text-brand" />}
+                    {canDelete && (
+                      <button
+                        onClick={() => deleteMessage(m.id, user.id)}
+                        className="ml-auto rounded p-1 text-ink-soft/40 transition hover:bg-red-50 hover:text-danger"
+                        title="Delete message"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
-                  <p className="mt-0.5 text-sm leading-relaxed text-ink">
-                    {m.body}
-                  </p>
+
+                  {m.deleted ? (
+                    <div className="mt-0.5">
+                      <p className="flex items-center gap-1.5 text-sm italic text-ink-soft">
+                        <Trash2 size={12} />
+                        {deleter
+                          ? `${deleter.name.split(" ")[0]} deleted this message`
+                          : "This message was deleted"}
+                      </p>
+                      {isAdmin && (m.originalBody ?? "") !== "" && (
+                        <div className="mt-1">
+                          <button
+                            onClick={() =>
+                              setRevealed((s) => {
+                                const n = new Set(s);
+                                if (n.has(m.id)) n.delete(m.id);
+                                else n.add(m.id);
+                                return n;
+                              })
+                            }
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-dark"
+                          >
+                            {isRevealed ? (
+                              <EyeOff size={12} />
+                            ) : (
+                              <Eye size={12} />
+                            )}
+                            {isRevealed ? "Hide" : "Show deleted (admin only)"}
+                          </button>
+                          {isRevealed && (
+                            <p className="mt-1 rounded-md border border-dashed border-line bg-surface-2 px-2.5 py-1.5 text-sm text-ink">
+                              {m.originalBody}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-0.5 text-sm leading-relaxed text-ink">
+                      {m.body}
+                    </p>
+                  )}
                 </div>
               </div>
             );

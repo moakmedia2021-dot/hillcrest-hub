@@ -98,18 +98,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      {/* User */}
+      {/* User → tap to open your profile */}
       <div className="border-t border-line p-3">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <Avatar member={user} size={38} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-ink">
-              {user.name}
+        <div className="flex items-center gap-1">
+          <Link
+            href="/profile"
+            onClick={() => setOpen(false)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-surface-2"
+            title="View your profile"
+          >
+            <Avatar member={user} size={38} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-ink">
+                {user.name}
+              </div>
+              <div className="mt-0.5">
+                <RoleBadge role={user.role} />
+              </div>
             </div>
-            <div className="mt-0.5">
-              <RoleBadge role={user.role} />
-            </div>
-          </div>
+          </Link>
           <button
             onClick={() => {
               signOut();

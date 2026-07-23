@@ -21,16 +21,31 @@ import { SEED } from "../seed";
 
 // ── Read: load everything into AppData ───────────────────
 export async function loadAll(sb: SupabaseClient): Promise<AppData> {
-  const [profiles, channels, chanMembers, messages, tasks, events, eventTasks] =
-    await Promise.all([
-      sb.from("profiles").select("*").order("name"),
-      sb.from("channels").select("*").order("created_at"),
-      sb.from("channel_members").select("*"),
-      sb.from("messages").select("*").order("created_at"),
-      sb.from("tasks").select("*").order("created_at", { ascending: false }),
-      sb.from("events").select("*").order("date"),
-      sb.from("event_tasks").select("*").order("sort"),
-    ]);
+  const [
+    profiles,
+    channels,
+    chanMembers,
+    messages,
+    tasks,
+    events,
+    eventTasks,
+    deletions,
+  ] = await Promise.all([
+    sb.from("profiles").select("*").order("name"),
+    sb.from("channels").select("*").order("created_at"),
+    sb.from("channel_members").select("*"),
+    sb.from("messages").select("*").order("created_at"),
+    sb.from("tasks").select("*").order("created_at", { ascending: false }),
+    sb.from("events").select("*").order("date"),
+    sb.from("event_tasks").select("*").order("sort"),
+    // Only admins get rows back (RLS); non-admins/older DBs get none.
+    sb.from("message_deletions").select("message_id, original_body"),
+  ]);
+
+  // message_id -> original deleted content (admins only)
+  const deletedBodies = new Map<string, string>();
+  for (const d of deletions.data ?? [])
+    deletedBodies.set(d.message_id as string, d.original_body as string);
 
   const members: Member[] = (profiles.data ?? []).map((p) => ({
     id: p.id,
@@ -41,6 +56,9 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     email: p.email ?? "",
     phone: p.phone ?? undefined,
     avatarColor: p.avatar_color ?? "#12a6db",
+    username: p.username ?? undefined,
+    avatarUrl: p.avatar_url ?? undefined,
+    bio: p.bio ?? undefined,
   }));
 
   const memberIdsByChannel = new Map<string, string[]>();
@@ -65,6 +83,9 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     body: m.body,
     pinned: m.pinned ?? false,
     createdAt: m.created_at,
+    deleted: m.deleted ?? false,
+    deletedById: m.deleted_by ?? undefined,
+    originalBody: deletedBodies.get(m.id) ?? undefined,
   }));
 
   const taskList: ProductionTask[] = (tasks.data ?? []).map((t) => ({
@@ -188,4 +209,37 @@ export const writes = {
 
   assignEventTask: (sb: SupabaseClient, taskId: string, assigneeId: string) =>
     sb.from("event_tasks").update({ assignee_id: assigneeId }).eq("id", taskId),
+
+  deleteMessage: (sb: SupabaseClient, msgId: string) =>
+    sb.rpc("delete_message", { msg_id: msgId }),
+
+  updateProfile: (
+    sb: SupabaseClient,
+    id: string,
+    patch: {
+      name?: string;
+      username?: string;
+      title?: string;
+      department?: string;
+      phone?: string;
+      bio?: string;
+      avatar_url?: string;
+    }
+  ) => sb.from("profiles").update(patch).eq("id", id),
 };
+
+// Upload an avatar image to Storage and return its public URL.
+export async function uploadAvatar(
+  sb: SupabaseClient,
+  userId: string,
+  file: File
+): Promise<{ url?: string; error?: string }> {
+  const ext = file.name.split(".").pop() || "png";
+  const path = `${userId}/avatar-${Date.now()}.${ext}`;
+  const up = await sb.storage
+    .from("avatars")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (up.error) return { error: up.error.message };
+  const { data } = sb.storage.from("avatars").getPublicUrl(path);
+  return { url: data.publicUrl };
+}

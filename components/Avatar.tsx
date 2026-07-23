@@ -6,9 +6,22 @@ export function Avatar({
   member,
   size = 36,
 }: {
-  member: Pick<Member, "name" | "avatarColor">;
+  member: Pick<Member, "name" | "avatarColor" | "avatarUrl">;
   size?: number;
 }) {
+  if (member.avatarUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={member.avatarUrl}
+        alt={member.name}
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white"

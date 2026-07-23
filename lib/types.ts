@@ -52,7 +52,10 @@ export interface Member {
   title?: string; // e.g. "Videographer"
   email: string;
   phone?: string;
-  avatarColor: string; // for the initials avatar
+  avatarColor: string; // for the initials avatar (fallback)
+  username?: string;
+  avatarUrl?: string; // profile picture; falls back to initials avatar
+  bio?: string;
 }
 
 export type ChannelKind = "announcement" | "team" | "department" | "direct";
@@ -72,6 +75,9 @@ export interface Message {
   body: string;
   createdAt: string; // ISO
   pinned?: boolean;
+  deleted?: boolean;
+  deletedById?: string; // who deleted it
+  originalBody?: string; // populated only for admins (the deleted content)
 }
 
 // Social-media / video production pipeline

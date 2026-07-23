@@ -70,6 +70,7 @@ interface StoreValue {
   data: AppData;
   // messages
   sendMessage: (channelId: string, authorId: string, body: string) => void;
+  deleteMessage: (messageId: string, byId: string) => void;
   // tasks
   addTask: (t: Omit<ProductionTask, "id" | "createdAt">) => void;
   moveTask: (taskId: string, stage: TaskStage) => void;
@@ -77,6 +78,15 @@ interface StoreValue {
   deleteTask: (taskId: string) => void;
   // members
   setMemberRole: (memberId: string, role: Member["role"]) => void;
+  updateProfile: (
+    memberId: string,
+    patch: Partial<
+      Pick<
+        Member,
+        "name" | "username" | "title" | "department" | "phone" | "bio" | "avatarUrl"
+      >
+    >
+  ) => void;
   // channels
   addChannel: (c: Omit<Channel, "id">) => void;
   // events
@@ -153,6 +163,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const sb = live();
         if (sb) fire(writes.sendMessage(sb, channelId, authorId, body.trim()));
       },
+      deleteMessage: (messageId, byId) => {
+        const sb = live();
+        if (sb) fire(writes.deleteMessage(sb, messageId));
+        // Optimistic soft-delete: blank the body, keep the original so admins
+        // can still reveal it (non-admins never receive it from the server).
+        setData((d) => ({
+          ...d,
+          messages: d.messages.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  deleted: true,
+                  deletedById: byId,
+                  originalBody: m.originalBody ?? m.body,
+                  body: "",
+                }
+              : m
+          ),
+        }));
+      },
       addTask: (t) => {
         const task: ProductionTask = {
           ...t,
@@ -191,6 +221,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           members: d.members.map((m) =>
             m.id === memberId ? { ...m, role } : m
+          ),
+        }));
+      },
+      updateProfile: (memberId, patch) => {
+        const sb = live();
+        if (sb)
+          fire(
+            writes.updateProfile(sb, memberId, {
+              name: patch.name,
+              username: patch.username,
+              title: patch.title,
+              department: patch.department,
+              phone: patch.phone,
+              bio: patch.bio,
+              avatar_url: patch.avatarUrl,
+            })
+          );
+        setData((d) => ({
+          ...d,
+          members: d.members.map((m) =>
+            m.id === memberId ? { ...m, ...patch } : m
           ),
         }));
       },

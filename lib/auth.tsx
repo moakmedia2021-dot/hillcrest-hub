@@ -133,6 +133,9 @@ function mapProfile(p: Record<string, unknown>): Member {
     email: (p.email as string) ?? "",
     phone: (p.phone as string) ?? undefined,
     avatarColor: (p.avatar_color as string) ?? "#12a6db",
+    username: (p.username as string) ?? undefined,
+    avatarUrl: (p.avatar_url as string) ?? undefined,
+    bio: (p.bio as string) ?? undefined,
   };
 }
 
