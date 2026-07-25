@@ -55,6 +55,11 @@ export default function CalendarPage() {
 
   const selItems = byDay[selected] ?? [];
 
+  // Production tasks with no due date yet — surfaced so nothing is missed.
+  const unscheduled = data.tasks.filter(
+    (t) => !t.dueDate && t.stage !== "posted"
+  );
+
   return (
     <>
       <PageHeader
@@ -85,7 +90,22 @@ export default function CalendarPage() {
         }
       />
 
-      <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-3">
+      <div className="space-y-4 p-5 sm:p-8">
+        <div className="flex flex-wrap items-center gap-4 text-xs text-ink-soft">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-2.5 rounded-sm"
+              style={{ background: "var(--brand)" }}
+            />{" "}
+            Event
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Production
+            task due
+          </span>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
         {/* Month grid */}
         <div className="card overflow-hidden lg:col-span-2">
           <div className="grid grid-cols-7 border-b border-line bg-surface-2 text-center text-[11px] font-bold uppercase tracking-wide text-ink-soft">
@@ -145,54 +165,94 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Selected day */}
-        <div className="card h-fit">
-          <div className="border-b border-line px-5 py-3.5">
-            <h2 className="font-bold text-ink">
-              {new Date(selected).toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </h2>
-          </div>
-          {selItems.length === 0 ? (
-            <p className="p-5 text-sm text-ink-soft">Nothing scheduled.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {selItems.map((it, idx) => (
-                <li key={idx}>
-                  <Link
-                    href={it.type === "event" ? `/events/${it.id}` : "/schedule"}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2"
-                  >
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                        it.type === "event"
-                          ? "bg-brand-soft text-brand-dark"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
+        {/* Right column */}
+        <div className="space-y-6">
+          {/* Selected day */}
+          <div className="card h-fit">
+            <div className="border-b border-line px-5 py-3.5">
+              <h2 className="font-bold text-ink">
+                {new Date(selected).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </h2>
+            </div>
+            {selItems.length === 0 ? (
+              <p className="p-5 text-sm text-ink-soft">Nothing scheduled.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {selItems.map((it, idx) => (
+                  <li key={idx}>
+                    <Link
+                      href={
+                        it.type === "event" ? `/events/${it.id}` : "/schedule"
+                      }
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2"
                     >
-                      {it.type === "event" ? (
-                        <CalendarDays size={16} />
-                      ) : (
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                          it.type === "event"
+                            ? "bg-brand-soft text-brand-dark"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {it.type === "event" ? (
+                          <CalendarDays size={16} />
+                        ) : (
+                          <KanbanSquare size={16} />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-ink">
+                          {it.title}
+                        </div>
+                        <div className="text-xs text-ink-soft">
+                          {it.type === "event" ? "Event" : "Task due"}
+                        </div>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Unscheduled production tasks */}
+          {unscheduled.length > 0 && (
+            <div className="card">
+              <div className="border-b border-line px-5 py-3.5">
+                <h2 className="font-bold text-ink">Unscheduled tasks</h2>
+                <p className="text-xs text-ink-soft">
+                  From the schedule, with no due date yet.
+                </p>
+              </div>
+              <ul className="max-h-72 divide-y divide-line overflow-y-auto">
+                {unscheduled.map((t) => (
+                  <li key={t.id}>
+                    <Link
+                      href="/schedule"
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
                         <KanbanSquare size={16} />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-ink">
-                        {it.title}
                       </div>
-                      <div className="text-xs text-ink-soft">
-                        {it.type === "event" ? "Event" : "Task due"}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-ink">
+                          {t.title}
+                        </div>
+                        <div className="text-xs text-ink-soft">
+                          Add a due date to schedule it
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
+      </div>
       </div>
     </>
   );
