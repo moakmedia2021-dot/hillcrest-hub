@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   MessagesSquare,
@@ -22,6 +22,7 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Avatar, RoleBadge } from "./Avatar";
@@ -29,18 +30,13 @@ import { NotificationBell } from "./NotificationBell";
 import { GlobalSearch } from "./GlobalSearch";
 import { ThemeToggle } from "./ThemeToggle";
 
-const MAIN_NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat", label: "Chat & Announcements", icon: MessagesSquare },
-  { href: "/schedule", label: "Production Schedule", icon: KanbanSquare },
-  { href: "/events", label: "Events", icon: CalendarRange },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/serving", label: "Serving", icon: CalendarCheck },
-  { href: "/resources", label: "Resources", icon: BookOpen },
-  { href: "/kudos", label: "Kudos", icon: Award },
-  { href: "/planning-center", label: "Planning Center", icon: FolderSync },
-  { href: "/team", label: "Team Directory", icon: Users },
-];
+type Item = { href: string; label: string; icon: typeof Users };
+
+const DASHBOARD: Item = {
+  href: "/dashboard",
+  label: "Dashboard",
+  icon: LayoutDashboard,
+};
 
 const SOON_NAV = [
   { label: "OneDrive Files", icon: CloudCog },
@@ -48,23 +44,131 @@ const SOON_NAV = [
   { label: "SMS Reminders", icon: MessageSquareText },
 ];
 
+const NAV_KEY = "hillcrest-hub:nav-collapsed:v1";
+// Tidier by default: these two start collapsed.
+const DEFAULT_COLLAPSED: Record<string, boolean> = {
+  Integrations: true,
+  "Coming soon": true,
+};
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut, can } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] =
+    useState<Record<string, boolean>>(DEFAULT_COLLAPSED);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(NAV_KEY) || "null");
+      if (saved) setCollapsed(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   if (!user) return null;
 
-  const nav = [...MAIN_NAV];
+  const groups: { label: string; items: Item[] }[] = [
+    {
+      label: "Communication",
+      items: [
+        { href: "/chat", label: "Chat & Announcements", icon: MessagesSquare },
+        { href: "/kudos", label: "Kudos", icon: Award },
+      ],
+    },
+    {
+      label: "Plan & Schedule",
+      items: [
+        { href: "/schedule", label: "Production Schedule", icon: KanbanSquare },
+        { href: "/events", label: "Events", icon: CalendarRange },
+        { href: "/calendar", label: "Calendar", icon: CalendarDays },
+        { href: "/serving", label: "Serving", icon: CalendarCheck },
+      ],
+    },
+    {
+      label: "Team",
+      items: [
+        { href: "/team", label: "Team Directory", icon: Users },
+        { href: "/resources", label: "Resources", icon: BookOpen },
+      ],
+    },
+    {
+      label: "Integrations",
+      items: [
+        { href: "/planning-center", label: "Planning Center", icon: FolderSync },
+      ],
+    },
+  ];
+
+  const leadership: Item[] = [];
   if (can("manage_schedule"))
-    nav.push({ href: "/analytics", label: "Analytics", icon: BarChart3 });
-  if (can("view_admin")) nav.push({ href: "/admin", label: "Admin", icon: Shield });
+    leadership.push({ href: "/analytics", label: "Analytics", icon: BarChart3 });
+  if (can("view_admin"))
+    leadership.push({ href: "/admin", label: "Admin", icon: Shield });
+  if (leadership.length) groups.push({ label: "Leadership", items: leadership });
+
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  const toggleGroup = (label: string) =>
+    setCollapsed((c) => {
+      const next = { ...c, [label]: !c[label] };
+      try {
+        window.localStorage.setItem(NAV_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+
+  const NavLink = ({ href, label, icon: Icon }: Item) => (
+    <Link
+      href={href}
+      onClick={() => setOpen(false)}
+      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+        isActive(href)
+          ? "bg-brand text-white shadow-sm"
+          : "text-ink-soft hover:bg-surface-2 hover:text-ink"
+      }`}
+    >
+      <Icon size={18} />
+      {label}
+    </Link>
+  );
+
+  const Group = ({
+    label,
+    children,
+    hasActive,
+  }: {
+    label: string;
+    children: React.ReactNode;
+    hasActive: boolean;
+  }) => {
+    const openGroup = hasActive || !collapsed[label];
+    return (
+      <div>
+        <button
+          onClick={() => toggleGroup(label)}
+          className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-ink-soft/70 transition hover:text-ink-soft"
+        >
+          {label}
+          <ChevronDown
+            size={13}
+            className={`transition-transform ${openGroup ? "" : "-rotate-90"}`}
+          />
+        </button>
+        {openGroup && <div className="mt-0.5 space-y-0.5">{children}</div>}
+      </div>
+    );
+  };
 
   const SidebarInner = (
     <div className="flex h-full flex-col">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-5 py-5">
+      <div className="flex shrink-0 items-center gap-2.5 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-white font-bold">
           H
         </div>
@@ -78,46 +182,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <NotificationBell />
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3">
-        {nav.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                active
-                  ? "bg-brand text-white shadow-sm"
-                  : "text-ink-soft hover:bg-surface-2 hover:text-ink"
-              }`}
+      <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-4">
+        <div className="space-y-0.5">
+          <NavLink {...DASHBOARD} />
+        </div>
+
+        {groups.map((g) => (
+          <Group
+            key={g.label}
+            label={g.label}
+            hasActive={g.items.some((i) => isActive(i.href))}
+          >
+            {g.items.map((i) => (
+              <NavLink key={i.href} {...i} />
+            ))}
+          </Group>
+        ))}
+
+        <Group label="Coming soon" hasActive={false}>
+          {SOON_NAV.map(({ label, icon: Icon }) => (
+            <div
+              key={label}
+              className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft/50"
+              title="Planned for a later phase"
             >
               <Icon size={18} />
-              {label}
-            </Link>
-          );
-        })}
-
-        <div className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-widest text-ink-soft/70">
-          Coming soon
-        </div>
-        {SOON_NAV.map(({ label, icon: Icon }) => (
-          <div
-            key={label}
-            className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-soft/50"
-            title="Planned for a later phase"
-          >
-            <Icon size={18} />
-            <span className="flex-1">{label}</span>
-            <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9px] font-bold uppercase text-ink-soft/60">
-              Soon
-            </span>
-          </div>
-        ))}
+              <span className="flex-1">{label}</span>
+              <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9px] font-bold uppercase text-ink-soft/60">
+                Soon
+              </span>
+            </div>
+          ))}
+        </Group>
       </nav>
 
       {/* User → tap to open your profile */}
-      <div className="border-t border-line p-3">
+      <div className="shrink-0 border-t border-line p-3">
         <div className="flex items-center gap-1">
           <Link
             href="/profile"

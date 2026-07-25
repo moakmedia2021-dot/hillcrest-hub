@@ -420,7 +420,7 @@ export default function ChatPage() {
                     {canDelete && (
                       <button
                         onClick={() => deleteMessage(m.id, user.id)}
-                        className="ml-auto rounded p-1 text-ink-soft/40 transition hover:bg-red-50 hover:text-danger"
+                        className="ml-auto rounded p-1 text-ink-soft/60 transition hover:bg-red-50 hover:text-danger"
                         title="Delete message"
                       >
                         <Trash2 size={13} />

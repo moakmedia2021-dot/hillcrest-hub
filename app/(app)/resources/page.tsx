@@ -130,7 +130,7 @@ export default function ResourcesPage() {
                         onClick={() => {
                           if (confirm(`Delete "${r.title}"?`)) deleteResource(r.id);
                         }}
-                        className="absolute right-2 top-2 rounded-lg bg-surface p-1.5 text-ink-soft opacity-0 shadow-sm transition hover:text-danger group-hover:opacity-100"
+                        className="absolute right-2 top-2 rounded-lg bg-surface/80 p-1.5 text-ink-soft/60 shadow-sm backdrop-blur transition hover:bg-surface hover:text-danger"
                         title="Delete"
                       >
                         <Trash2 size={14} />
