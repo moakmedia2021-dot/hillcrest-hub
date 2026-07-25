@@ -20,6 +20,22 @@
   --danger: #dc2626;
 }
 
+:root[data-theme="dark"] {
+  --brand: #38b6e8;
+  --brand-dark: #1493c4;
+  --brand-soft: #0e2a38;
+  --ink: #e8eaed;
+  --ink-soft: #9aa3ad;
+  --line: #2a2f36;
+  --surface: #181b1f;
+  --surface-2: #21262b;
+  --bg: #0e1013;
+
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --danger: #f04747;
+}
+
 @theme inline {
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);

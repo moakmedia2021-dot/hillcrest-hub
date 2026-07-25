@@ -9,8 +9,11 @@ import {
   KanbanSquare,
   Users,
   Shield,
+  BarChart3,
   CalendarRange,
   CalendarDays,
+  CalendarCheck,
+  Award,
   BookOpen,
   Mail,
   MessageSquareText,
@@ -23,6 +26,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Avatar, RoleBadge } from "./Avatar";
 import { NotificationBell } from "./NotificationBell";
+import { GlobalSearch } from "./GlobalSearch";
+import { ThemeToggle } from "./ThemeToggle";
 
 const MAIN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -30,7 +35,9 @@ const MAIN_NAV = [
   { href: "/schedule", label: "Production Schedule", icon: KanbanSquare },
   { href: "/events", label: "Events", icon: CalendarRange },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/serving", label: "Serving", icon: CalendarCheck },
   { href: "/resources", label: "Resources", icon: BookOpen },
+  { href: "/kudos", label: "Kudos", icon: Award },
   { href: "/planning-center", label: "Planning Center", icon: FolderSync },
   { href: "/team", label: "Team Directory", icon: Users },
 ];
@@ -50,6 +57,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   const nav = [...MAIN_NAV];
+  if (can("manage_schedule"))
+    nav.push({ href: "/analytics", label: "Analytics", icon: BarChart3 });
   if (can("view_admin")) nav.push({ href: "/admin", label: "Admin", icon: Shield });
 
   const SidebarInner = (
@@ -59,10 +68,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-white font-bold">
           H
         </div>
-        <div className="flex-1 leading-tight">
-          <div className="text-[15px] font-bold text-ink">Hillcrest Hub</div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="truncate text-[15px] font-bold text-ink">
+            Hillcrest Hub
+          </div>
           <div className="text-[11px] text-ink-soft">Team Workspace</div>
         </div>
+        <GlobalSearch />
         <NotificationBell />
       </div>
 
@@ -123,6 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </Link>
+          <ThemeToggle />
           <button
             onClick={() => {
               signOut();
@@ -174,7 +187,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <span className="font-bold text-ink">Hillcrest Hub</span>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center">
+            <GlobalSearch />
+            <ThemeToggle />
             <NotificationBell />
           </div>
         </header>

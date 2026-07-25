@@ -371,4 +371,32 @@ export const SEED: AppData = {
       createdAt: hoursAgo(60),
     },
   ],
+
+  availability: [
+    { memberId: "u_james", date: daysFromNow(4) },
+    { memberId: "u_grace", date: daysFromNow(4) },
+    { memberId: "u_malachi", date: daysFromNow(11) },
+  ],
+
+  rsvps: [
+    { eventId: "ev_youth", memberId: "u_grace", status: "going" },
+    { eventId: "ev_youth", memberId: "u_james", status: "maybe" },
+  ],
+
+  kudos: [
+    {
+      id: "k1",
+      fromId: "u_michael",
+      toId: "u_malachi",
+      message: "The sermon bumper was incredible this week — thank you for pouring into it! 🙌",
+      createdAt: hoursAgo(30),
+    },
+    {
+      id: "k2",
+      fromId: "u_sarah",
+      toId: "u_grace",
+      message: "Fastest edit turnaround ever. You're a rockstar. 🎬",
+      createdAt: hoursAgo(10),
+    },
+  ],
 };

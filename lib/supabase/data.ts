@@ -15,6 +15,10 @@ import type {
   ProductionTask,
   ChurchEvent,
   Resource,
+  Availability,
+  Rsvp,
+  Kudos,
+  RsvpStatus,
   Role,
   TaskStage,
   ResourceKind,
@@ -33,6 +37,9 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     eventTasks,
     deletions,
     resources,
+    availability,
+    rsvps,
+    kudos,
   ] = await Promise.all([
     sb.from("profiles").select("*").order("name"),
     sb.from("channels").select("*").order("created_at"),
@@ -44,6 +51,9 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     // Only admins get rows back (RLS); non-admins/older DBs get none.
     sb.from("message_deletions").select("message_id, original_body"),
     sb.from("resources").select("*").order("created_at", { ascending: false }),
+    sb.from("availability").select("*"),
+    sb.from("event_rsvps").select("*"),
+    sb.from("kudos").select("*").order("created_at", { ascending: false }),
   ]);
 
   // message_id -> original deleted content (admins only)
@@ -147,6 +157,25 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     events: eventList,
     templates: SEED.templates, // static app constants
     resources: resourceList,
+    availability: (availability.data ?? []).map(
+      (a): Availability => ({ memberId: a.member_id, date: a.date })
+    ),
+    rsvps: (rsvps.data ?? []).map(
+      (r): Rsvp => ({
+        eventId: r.event_id,
+        memberId: r.member_id,
+        status: r.status as RsvpStatus,
+      })
+    ),
+    kudos: (kudos.data ?? []).map(
+      (k): Kudos => ({
+        id: k.id,
+        fromId: k.from_id ?? undefined,
+        toId: k.to_id,
+        message: k.message,
+        createdAt: k.created_at,
+      })
+    ),
   };
 }
 
@@ -161,6 +190,9 @@ export function subscribe(sb: SupabaseClient, onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "channels" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "channel_members" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "resources" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "availability" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "event_rsvps" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "kudos" }, onChange)
     .subscribe();
   return () => {
     sb.removeChannel(channel);
@@ -328,6 +360,37 @@ export const writes = {
       avatar_url?: string;
     }
   ) => sb.from("profiles").update(patch).eq("id", id),
+
+  setAvailability: (
+    sb: SupabaseClient,
+    memberId: string,
+    date: string,
+    on: boolean
+  ) =>
+    on
+      ? sb.from("availability").upsert({ member_id: memberId, date })
+      : sb
+          .from("availability")
+          .delete()
+          .eq("member_id", memberId)
+          .eq("date", date),
+
+  setRsvp: (
+    sb: SupabaseClient,
+    eventId: string,
+    memberId: string,
+    status: string
+  ) =>
+    sb
+      .from("event_rsvps")
+      .upsert({ event_id: eventId, member_id: memberId, status }),
+
+  giveKudos: (
+    sb: SupabaseClient,
+    fromId: string,
+    toId: string,
+    message: string
+  ) => sb.from("kudos").insert({ from_id: fromId, to_id: toId, message }),
 };
 
 // Upload an avatar image to Storage and return its public URL.

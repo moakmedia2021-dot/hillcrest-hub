@@ -30,6 +30,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={poppins.variable}>
       <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('hillcrest-hub:theme')==='dark')document.documentElement.dataset.theme='dark';}catch(e){}`,
+          }}
+        />
         <StoreProvider>
           <AuthProvider>{children}</AuthProvider>
         </StoreProvider>

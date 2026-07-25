@@ -185,6 +185,27 @@ export interface ChurchEvent {
   createdAt: string;
 }
 
+export interface Availability {
+  memberId: string;
+  date: string; // ISO date I can serve
+}
+
+export type RsvpStatus = "going" | "maybe" | "no";
+
+export interface Rsvp {
+  eventId: string;
+  memberId: string;
+  status: RsvpStatus;
+}
+
+export interface Kudos {
+  id: string;
+  fromId?: string;
+  toId: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface AppData {
   members: Member[];
   channels: Channel[];
@@ -193,4 +214,7 @@ export interface AppData {
   templates: EventTemplate[];
   events: ChurchEvent[];
   resources: Resource[];
+  availability: Availability[];
+  rsvps: Rsvp[];
+  kudos: Kudos[];
 }

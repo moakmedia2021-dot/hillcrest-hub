@@ -31,8 +31,9 @@ export default function EventDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { data, toggleEventTask, assignEventTask, deleteEvent } = useStore();
-  const { can } = useAuth();
+  const { data, toggleEventTask, assignEventTask, deleteEvent, setRsvp } =
+    useStore();
+  const { user, can } = useAuth();
   const manage = can("manage_events");
 
   const event = data.events.find((e) => e.id === id);
@@ -55,6 +56,15 @@ export default function EventDetailPage({
     event.tasks.length === 0
       ? 0
       : Math.round((done / event.tasks.length) * 100);
+
+  const eventRsvps = data.rsvps.filter((r) => r.eventId === event.id);
+  const myRsvp = eventRsvps.find((r) => r.memberId === user?.id)?.status;
+  const goingCount = eventRsvps.filter((r) => r.status === "going").length;
+  const maybeCount = eventRsvps.filter((r) => r.status === "maybe").length;
+  const goingMembers = eventRsvps
+    .filter((r) => r.status === "going")
+    .map((r) => data.members.find((m) => m.id === r.memberId))
+    .filter(Boolean);
 
   return (
     <div className="mx-auto max-w-3xl p-5 sm:p-8">
@@ -133,6 +143,55 @@ export default function EventDetailPage({
           </div>
         </div>
       </div>
+
+      {/* RSVP */}
+      {user && (
+        <div className="card mt-5 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-bold text-ink">Will you be there?</h2>
+            <span className="text-xs text-ink-soft">
+              {goingCount} going · {maybeCount} maybe
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {(
+              [
+                ["going", "Going"],
+                ["maybe", "Maybe"],
+                ["no", "Can't make it"],
+              ] as const
+            ).map(([s, label]) => (
+              <button
+                key={s}
+                onClick={() => setRsvp(event.id, user.id, s)}
+                className={`flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  myRsvp === s
+                    ? "border-brand bg-brand text-white"
+                    : "border-line text-ink-soft hover:bg-surface-2"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {goingMembers.length > 0 && (
+            <div className="mt-3 flex -space-x-2">
+              {goingMembers.slice(0, 10).map(
+                (m) =>
+                  m && (
+                    <div
+                      key={m.id}
+                      className="rounded-full ring-2 ring-surface"
+                      title={m.name}
+                    >
+                      <Avatar member={m} size={26} />
+                    </div>
+                  )
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Checklist */}
       <div className="card mt-5 divide-y divide-line">

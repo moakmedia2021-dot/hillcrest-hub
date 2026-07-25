@@ -26,6 +26,7 @@ import type {
   ChurchEvent,
   EventTemplate,
   Resource,
+  RsvpStatus,
 } from "./types";
 import { SUPABASE_ENABLED } from "./supabase/config";
 import { getSupabase } from "./supabase/client";
@@ -98,6 +99,10 @@ interface StoreValue {
   // resources
   addResource: (r: Omit<Resource, "id" | "createdAt">) => void;
   deleteResource: (id: string) => void;
+  // serving / rsvps / kudos
+  toggleAvailability: (memberId: string, date: string, on: boolean) => void;
+  setRsvp: (eventId: string, memberId: string, status: RsvpStatus) => void;
+  giveKudos: (fromId: string, toId: string, message: string) => void;
   // channels
   addChannel: (c: Omit<Channel, "id">) => void;
   createChat: (input: {
@@ -307,6 +312,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData((d) => ({
           ...d,
           resources: d.resources.filter((r) => r.id !== id),
+        }));
+      },
+      toggleAvailability: (memberId, date, on) => {
+        const sb = live();
+        if (sb) fire(writes.setAvailability(sb, memberId, date, on));
+        setData((d) => {
+          const rest = d.availability.filter(
+            (a) => !(a.memberId === memberId && a.date === date)
+          );
+          return { ...d, availability: on ? [...rest, { memberId, date }] : rest };
+        });
+      },
+      setRsvp: (eventId, memberId, status) => {
+        const sb = live();
+        if (sb) fire(writes.setRsvp(sb, eventId, memberId, status));
+        setData((d) => ({
+          ...d,
+          rsvps: [
+            ...d.rsvps.filter(
+              (r) => !(r.eventId === eventId && r.memberId === memberId)
+            ),
+            { eventId, memberId, status },
+          ],
+        }));
+      },
+      giveKudos: (fromId, toId, message) => {
+        const sb = live();
+        if (sb) fire(writes.giveKudos(sb, fromId, toId, message));
+        setData((d) => ({
+          ...d,
+          kudos: [
+            { id: uid(), fromId, toId, message, createdAt: new Date().toISOString() },
+            ...d.kudos,
+          ],
         }));
       },
       addChannel: (c) =>
