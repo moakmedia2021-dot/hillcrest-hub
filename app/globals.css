@@ -76,6 +76,60 @@ body {
   border-radius: 14px;
 }
 
+/* ─────────────────────────────────────────────
+   Premium moving-gradient animations
+   ───────────────────────────────────────────── */
+@keyframes hh-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Brand-tinted animated gradient — logo tiles & small accents */
+.hh-gradient {
+  background: linear-gradient(
+    120deg,
+    var(--brand-dark),
+    var(--brand),
+    #7fd2ee,
+    var(--brand),
+    var(--brand-dark)
+  );
+  background-size: 220% 220%;
+  animation: hh-pan 8s ease-in-out infinite;
+}
+
+/* Richer full-screen hero gradient — login & approval screens */
+.hh-hero {
+  background: linear-gradient(125deg, #0b6f9c, #12a6db, #57c7ec, #0d7aaa, #0a6690);
+  background-size: 260% 260%;
+  animation: hh-pan 15s ease-in-out infinite;
+}
+
+/* Animated gradient wordmark — subtle premium touch on the brand name */
+.hh-gradient-text {
+  background: linear-gradient(120deg, var(--brand-dark), var(--brand), #7fd2ee, var(--brand));
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hh-pan 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hh-gradient,
+  .hh-hero,
+  .hh-gradient-text {
+    animation: none;
+  }
+}
+
 /* Thin, tasteful scrollbars */
 ::-webkit-scrollbar {
   width: 10px;

@@ -25,6 +25,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { Logo } from "./Logo";
 import { Avatar, RoleBadge } from "./Avatar";
 import { NotificationBell } from "./NotificationBell";
 import { GlobalSearch } from "./GlobalSearch";
@@ -169,11 +170,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-full flex-col">
       {/* Brand */}
       <div className="flex shrink-0 items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-white font-bold">
-          H
+        <div className="hh-gradient flex h-9 w-9 items-center justify-center rounded-lg text-white shadow-sm shadow-brand/30">
+          <Logo className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-[15px] font-bold text-ink">
+          <div className="hh-gradient-text truncate text-[15px] font-bold">
             Hillcrest Hub
           </div>
           <div className="text-[11px] text-ink-soft">Team Workspace</div>
@@ -282,10 +283,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">
-              H
+            <div className="hh-gradient flex h-7 w-7 items-center justify-center rounded-md text-white">
+              <Logo className="h-4 w-4" />
             </div>
-            <span className="font-bold text-ink">Hillcrest Hub</span>
+            <span className="hh-gradient-text font-bold">Hillcrest Hub</span>
           </div>
           <div className="ml-auto flex items-center">
             <GlobalSearch />

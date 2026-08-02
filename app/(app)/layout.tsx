@@ -29,7 +29,7 @@ export default function AppLayout({
   // New accounts wait for an admin to approve them.
   if (user.approved === false) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand to-brand-dark px-4">
+      <div className="hh-hero flex min-h-screen items-center justify-center px-4">
         <div className="card max-w-md p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-brand-dark">
             <Clock size={26} />

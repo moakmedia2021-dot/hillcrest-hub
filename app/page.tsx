@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Avatar, RoleBadge } from "@/components/Avatar";
+import { Logo } from "@/components/Logo";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -16,11 +17,11 @@ export default function LoginPage() {
   }, [ready, user, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand to-brand-dark px-4 py-10">
+    <div className="hh-hero flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center text-white">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-2xl font-bold backdrop-blur">
-            H
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-white shadow-lg shadow-black/10 ring-1 ring-white/20 backdrop-blur">
+            <Logo className="h-8 w-8" />
           </div>
           <h1 className="text-2xl font-bold">Hillcrest Hub</h1>
           <p className="mt-1 text-sm text-white/80">
