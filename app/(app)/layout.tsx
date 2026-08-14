@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
+import { ChurchOnboarding } from "@/components/ChurchOnboarding";
+import { SUPABASE_ENABLED } from "@/lib/supabase/config";
 import { Clock, LogOut } from "lucide-react";
 
 export default function AppLayout({
@@ -26,6 +28,11 @@ export default function AppLayout({
     );
   }
 
+  // Signed in but not connected to a church yet — create one or join one.
+  if (SUPABASE_ENABLED && !user.orgId) {
+    return <ChurchOnboarding />;
+  }
+
   // New accounts wait for an admin to approve them.
   if (user.approved === false) {
     return (
@@ -36,9 +43,9 @@ export default function AppLayout({
           </div>
           <h1 className="text-xl font-bold text-ink">You&apos;re almost in!</h1>
           <p className="mt-2 text-sm text-ink-soft">
-            Thanks for signing up, {user.name.split(" ")[0]}. A Hillcrest admin
-            needs to approve your account before you can join. You&apos;ll get
-            access as soon as they do.
+            Thanks for signing up, {user.name.split(" ")[0]}. An admin at your
+            church needs to approve your account before you can join.
+            You&apos;ll get access as soon as they do.
           </p>
           <button
             onClick={() => {

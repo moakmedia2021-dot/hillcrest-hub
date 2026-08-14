@@ -39,6 +39,8 @@ interface AuthValue {
     email: string,
     password: string
   ) => Promise<{ error?: string }>;
+  // re-read the profile (after creating or joining a church)
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -51,6 +53,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // supabase: the fetched profile mapped to a Member
   const [profile, setProfile] = useState<Member | null>(null);
 
+  const loadProfile = async (userId: string) => {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data: p } = await sb
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    setProfile(p ? mapProfile(p) : null);
+  };
+
+  const refreshUser = async () => {
+    const sb = SUPABASE_ENABLED ? getSupabase() : null;
+    if (!sb) return;
+    const {
+      data: { session },
+    } = await sb.auth.getSession();
+    if (session) await loadProfile(session.user.id);
+  };
+
   useEffect(() => {
     const sb = SUPABASE_ENABLED ? getSupabase() : null;
     if (!sb) {
@@ -58,15 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
       return;
     }
-
-    const loadProfile = async (userId: string) => {
-      const { data: p } = await sb
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-      setProfile(p ? mapProfile(p) : null);
-    };
 
     sb.auth.getSession().then(({ data: { session } }) => {
       if (session) loadProfile(session.user.id);
@@ -118,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return { error: error?.message };
     },
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -137,6 +151,7 @@ function mapProfile(p: Record<string, unknown>): Member {
     avatarUrl: (p.avatar_url as string) ?? undefined,
     bio: (p.bio as string) ?? undefined,
     approved: (p.approved as boolean) ?? true,
+    orgId: (p.org_id as string) ?? undefined,
   };
 }
 

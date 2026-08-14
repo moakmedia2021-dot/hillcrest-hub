@@ -40,6 +40,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     availability,
     rsvps,
     kudos,
+    orgs,
   ] = await Promise.all([
     sb.from("profiles").select("*").order("name"),
     sb.from("channels").select("*").order("created_at"),
@@ -54,7 +55,20 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     sb.from("availability").select("*"),
     sb.from("event_rsvps").select("*"),
     sb.from("kudos").select("*").order("created_at", { ascending: false }),
+    // RLS returns only the caller's church.
+    sb.from("organizations").select("*").limit(1),
   ]);
+
+  const orgRow = orgs.data?.[0];
+  const org = orgRow
+    ? {
+        id: orgRow.id as string,
+        name: orgRow.name as string,
+        inviteCode: (orgRow.invite_code as string) ?? "",
+        brandColor: (orgRow.brand_color as string) ?? undefined,
+        logoUrl: (orgRow.logo_url as string) ?? undefined,
+      }
+    : undefined;
 
   // message_id -> original deleted content (admins only)
   const deletedBodies = new Map<string, string>();
@@ -74,6 +88,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     avatarUrl: p.avatar_url ?? undefined,
     bio: p.bio ?? undefined,
     approved: p.approved ?? true, // pre-migration rows have no column → allow
+    orgId: p.org_id ?? undefined,
   }));
 
   const resourceList: Resource[] = (resources.data ?? []).map((r) => ({
@@ -150,6 +165,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
   }));
 
   return {
+    org,
     members,
     channels: channelList,
     messages: messageList,
@@ -391,7 +407,34 @@ export const writes = {
     toId: string,
     message: string
   ) => sb.from("kudos").insert({ from_id: fromId, to_id: toId, message }),
+
+  renameOrg: (sb: SupabaseClient, orgId: string, name: string) =>
+    sb.from("organizations").update({ name }).eq("id", orgId),
 };
+
+// ── Starting or joining a church ─────────────────────────
+export async function createOrganization(
+  sb: SupabaseClient,
+  name: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("create_organization", { org_name: name });
+  return { error: error?.message };
+}
+
+export async function joinOrganization(
+  sb: SupabaseClient,
+  code: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("join_organization", { code });
+  return { error: error?.message };
+}
+
+export async function regenerateInviteCode(
+  sb: SupabaseClient
+): Promise<{ code?: string; error?: string }> {
+  const { data, error } = await sb.rpc("regenerate_invite_code");
+  return { code: data as string | undefined, error: error?.message };
+}
 
 // Upload an avatar image to Storage and return its public URL.
 export async function uploadAvatar(

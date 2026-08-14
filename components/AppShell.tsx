@@ -25,6 +25,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useStore } from "@/lib/store";
 import { Logo } from "./Logo";
 import { Avatar, RoleBadge } from "./Avatar";
 import { NotificationBell } from "./NotificationBell";
@@ -54,6 +55,8 @@ const DEFAULT_COLLAPSED: Record<string, boolean> = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut, can } = useAuth();
+  const { data } = useStore();
+  const churchName = data.org?.name ?? "Hillcrest Hub";
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -174,8 +177,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Logo className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="hh-gradient-text truncate text-[15px] font-bold">
-            Hillcrest Hub
+          <div
+            className="hh-gradient-text truncate text-[15px] font-bold"
+            title={churchName}
+          >
+            {churchName}
           </div>
           <div className="text-[11px] text-ink-soft">Team Workspace</div>
         </div>
@@ -286,7 +292,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="hh-gradient flex h-7 w-7 items-center justify-center rounded-md text-white">
               <Logo className="h-4 w-4" />
             </div>
-            <span className="hh-gradient-text font-bold">Hillcrest Hub</span>
+            <span className="hh-gradient-text truncate font-bold">
+              {churchName}
+            </span>
           </div>
           <div className="ml-auto flex items-center">
             <GlobalSearch />

@@ -13,7 +13,10 @@ import {
   type Role,
   type Permission,
 } from "@/lib/types";
-import { Check, Minus, RotateCcw } from "lucide-react";
+import { getSupabase } from "@/lib/supabase/client";
+import { regenerateInviteCode } from "@/lib/supabase/data";
+import { Check, Minus, RotateCcw, Copy, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 const ROLES: Role[] = ["admin", "pastor", "lead", "volunteer"];
 
@@ -61,6 +64,9 @@ export default function AdminPage() {
       />
 
       <div className="space-y-8 p-5 sm:p-8">
+        {/* Invite code */}
+        {data.org && <InviteCard />}
+
         {/* Pending approvals */}
         {pending.length > 0 && (
           <section className="card overflow-hidden ring-2 ring-amber-200">
@@ -209,5 +215,70 @@ export default function AdminPage() {
         </section>
       </div>
     </>
+  );
+}
+
+// Admins share this code so their team can join the right church.
+function InviteCard() {
+  const { data } = useStore();
+  const [code, setCode] = useState(data.org?.inviteCode ?? "");
+  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const roll = async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+    if (
+      !confirm(
+        "Generate a new invite code? The old one stops working immediately."
+      )
+    )
+      return;
+    setBusy(true);
+    const res = await regenerateInviteCode(sb);
+    setBusy(false);
+    if (res.code) setCode(res.code);
+  };
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-line px-5 py-3.5">
+        <h2 className="font-bold text-ink">Invite your team</h2>
+        <p className="text-xs text-ink-soft">
+          Share this code. Anyone who signs up and enters it joins{" "}
+          {data.org?.name} — pending your approval.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 p-5">
+        <code className="rounded-xl border border-line bg-surface-2 px-5 py-3 text-2xl font-bold tracking-[0.3em] text-ink">
+          {code}
+        </code>
+        <button
+          onClick={copy}
+          className="flex items-center gap-2 rounded-xl border border-line px-3.5 py-2.5 text-sm font-semibold text-ink-soft hover:bg-surface-2"
+        >
+          {copied ? <Check size={15} /> : <Copy size={15} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <button
+          onClick={roll}
+          disabled={busy}
+          className="flex items-center gap-2 rounded-xl border border-line px-3.5 py-2.5 text-sm font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+        >
+          <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
+          New code
+        </button>
+      </div>
+    </section>
   );
 }

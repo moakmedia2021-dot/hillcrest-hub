@@ -2,6 +2,16 @@
 // Core domain types for Hillcrest Hub
 // ─────────────────────────────────────────────
 
+// A church. Every piece of data belongs to exactly one, and the database
+// enforces that one church can never read another's.
+export interface Organization {
+  id: string;
+  name: string;
+  inviteCode: string;
+  brandColor?: string;
+  logoUrl?: string;
+}
+
 export type Role = "admin" | "pastor" | "lead" | "volunteer";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -56,6 +66,7 @@ export interface Member {
   avatarUrl?: string; // profile picture; falls back to initials avatar
   bio?: string;
   approved?: boolean; // false = pending admin approval
+  orgId?: string; // which church they belong to
 }
 
 export type ResourceKind = "link" | "file" | "video" | "doc" | "note";
@@ -207,6 +218,7 @@ export interface Kudos {
 }
 
 export interface AppData {
+  org?: Organization; // the signed-in user's church
   members: Member[];
   channels: Channel[];
   messages: Message[];
