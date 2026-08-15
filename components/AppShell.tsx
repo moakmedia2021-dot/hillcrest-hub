@@ -10,6 +10,7 @@ import {
   Users,
   Shield,
   BarChart3,
+  Building2,
   CalendarRange,
   CalendarDays,
   CalendarCheck,
@@ -112,6 +113,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (can("view_admin"))
     leadership.push({ href: "/admin", label: "Admin", icon: Shield });
   if (leadership.length) groups.push({ label: "Leadership", items: leadership });
+
+  // Internal platform team only — never shown to churches.
+  if (user.platformAdmin)
+    groups.push({
+      label: "Platform",
+      items: [
+        { href: "/app-admin", label: "App Admin", icon: Building2 },
+      ],
+    });
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");

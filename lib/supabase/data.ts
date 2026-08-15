@@ -15,6 +15,7 @@ import type {
   ProductionTask,
   ChurchEvent,
   Resource,
+  Organization,
   Availability,
   Rsvp,
   Kudos,
@@ -67,6 +68,9 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
         inviteCode: (orgRow.invite_code as string) ?? "",
         brandColor: (orgRow.brand_color as string) ?? undefined,
         logoUrl: (orgRow.logo_url as string) ?? undefined,
+        plan: (orgRow.plan as Organization["plan"]) ?? undefined,
+        status: (orgRow.status as Organization["status"]) ?? undefined,
+        trialEndsAt: (orgRow.trial_ends_at as string) ?? undefined,
       }
     : undefined;
 
@@ -415,9 +419,70 @@ export const writes = {
 // ── Starting or joining a church ─────────────────────────
 export async function createOrganization(
   sb: SupabaseClient,
-  name: string
+  name: string,
+  plan: string = "starter"
 ): Promise<{ error?: string }> {
-  const { error } = await sb.rpc("create_organization", { org_name: name });
+  const { error } = await sb.rpc("create_organization", {
+    org_name: name,
+    plan_name: plan,
+  });
+  return { error: error?.message };
+}
+
+// TEST MODE: marks the subscription active without taking payment.
+// A real Stripe checkout webhook replaces this call.
+export async function activateSubscriptionTest(
+  sb: SupabaseClient,
+  plan: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("activate_subscription_test", {
+    plan_name: plan,
+  });
+  return { error: error?.message };
+}
+
+// ── Platform admin (internal) ────────────────────────────
+export interface PlatformOrg {
+  id: string;
+  name: string;
+  invite_code: string;
+  plan: string;
+  status: string;
+  trial_ends_at: string | null;
+  created_at: string;
+  members: number;
+  pending: number;
+  messages: number;
+  events: number;
+  tasks: number;
+}
+
+export interface PlatformOverview {
+  orgs: PlatformOrg[];
+  totals: {
+    churches: number;
+    members: number;
+    active: number;
+    trialing: number;
+  };
+}
+
+export async function platformOverview(
+  sb: SupabaseClient
+): Promise<{ data?: PlatformOverview; error?: string }> {
+  const { data, error } = await sb.rpc("platform_overview");
+  return { data: data as PlatformOverview | undefined, error: error?.message };
+}
+
+export async function platformSetOrgStatus(
+  sb: SupabaseClient,
+  orgId: string,
+  status: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("platform_set_org_status", {
+    target_org: orgId,
+    new_status: status,
+  });
   return { error: error?.message };
 }
 

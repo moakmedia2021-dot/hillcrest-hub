@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
@@ -160,18 +161,28 @@ function SupabaseAuth() {
         </button>
       </div>
 
-      <button
-        onClick={() => {
-          setMode(mode === "in" ? "up" : "in");
-          setError(null);
-          setNotice(null);
-        }}
-        className="mt-4 w-full text-center text-sm text-ink-soft hover:text-brand"
-      >
-        {mode === "in"
-          ? "Need an account? Sign up"
-          : "Already have an account? Sign in"}
-      </button>
+      {mode === "in" ? (
+        <p className="mt-4 text-center text-sm text-ink-soft">
+          Need an account?{" "}
+          <Link
+            href="/sign-up"
+            className="font-semibold text-brand hover:text-brand-dark"
+          >
+            Sign up
+          </Link>
+        </p>
+      ) : (
+        <button
+          onClick={() => {
+            setMode("in");
+            setError(null);
+            setNotice(null);
+          }}
+          className="mt-4 w-full text-center text-sm text-ink-soft hover:text-brand"
+        >
+          Already have an account? Sign in
+        </button>
+      )}
     </div>
   );
 }

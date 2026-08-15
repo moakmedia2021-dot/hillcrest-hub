@@ -4,12 +4,74 @@
 
 // A church. Every piece of data belongs to exactly one, and the database
 // enforces that one church can never read another's.
+export type PlanId = "starter" | "growth" | "multisite";
+export type SubStatus =
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "suspended";
+
+export const PLANS: {
+  id: PlanId;
+  name: string;
+  price: string;
+  cadence: string;
+  blurb: string;
+  features: string[];
+}[] = [
+  {
+    id: "starter",
+    name: "Starter",
+    price: "$0",
+    cadence: "free while in beta",
+    blurb: "Small churches and single teams.",
+    features: [
+      "Up to 25 members",
+      "Chat, schedule, events, calendar",
+      "Serving availability & rosters",
+      "Department resources",
+    ],
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    price: "$29",
+    cadence: "per month",
+    blurb: "Growing churches with multiple ministries.",
+    features: [
+      "Unlimited members",
+      "Everything in Starter",
+      "Leadership analytics",
+      "Planning Center integration",
+      "Priority support",
+    ],
+  },
+  {
+    id: "multisite",
+    name: "Multisite",
+    price: "$79",
+    cadence: "per month",
+    blurb: "Large and multi-campus churches.",
+    features: [
+      "Everything in Growth",
+      "Multiple campuses",
+      "Delegated admin per campus",
+      "Advanced reporting",
+      "Onboarding help",
+    ],
+  },
+];
+
 export interface Organization {
   id: string;
   name: string;
   inviteCode: string;
   brandColor?: string;
   logoUrl?: string;
+  plan?: PlanId;
+  status?: SubStatus;
+  trialEndsAt?: string;
 }
 
 export type Role = "admin" | "pastor" | "lead" | "volunteer";
@@ -67,6 +129,7 @@ export interface Member {
   bio?: string;
   approved?: boolean; // false = pending admin approval
   orgId?: string; // which church they belong to
+  platformAdmin?: boolean; // runs the platform itself — granted via SQL only
 }
 
 export type ResourceKind = "link" | "file" | "video" | "doc" | "note";

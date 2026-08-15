@@ -152,6 +152,7 @@ function mapProfile(p: Record<string, unknown>): Member {
     bio: (p.bio as string) ?? undefined,
     approved: (p.approved as boolean) ?? true,
     orgId: (p.org_id as string) ?? undefined,
+    platformAdmin: (p.platform_admin as boolean) ?? false,
   };
 }
 

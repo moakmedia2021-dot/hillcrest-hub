@@ -14,8 +14,12 @@ import {
   type Permission,
 } from "@/lib/types";
 import { getSupabase } from "@/lib/supabase/client";
-import { regenerateInviteCode } from "@/lib/supabase/data";
-import { Check, Minus, RotateCcw, Copy, RefreshCw } from "lucide-react";
+import {
+  regenerateInviteCode,
+  activateSubscriptionTest,
+} from "@/lib/supabase/data";
+import { PLANS } from "@/lib/types";
+import { Check, Minus, RotateCcw, Copy, RefreshCw, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 const ROLES: Role[] = ["admin", "pastor", "lead", "volunteer"];
@@ -64,8 +68,9 @@ export default function AdminPage() {
       />
 
       <div className="space-y-8 p-5 sm:p-8">
-        {/* Invite code */}
+        {/* Invite code + billing */}
         {data.org && <InviteCard />}
+        {data.org && <BillingCard />}
 
         {/* Pending approvals */}
         {pending.length > 0 && (
@@ -279,6 +284,111 @@ function InviteCard() {
           New code
         </button>
       </div>
+    </section>
+  );
+}
+
+// Plan + subscription state for this church. Payment is stubbed in test mode.
+function BillingCard() {
+  const { data } = useStore();
+  const org = data.org;
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(org?.status ?? "trialing");
+  const [plan, setPlan] = useState(org?.plan ?? "starter");
+
+  const activate = async (planId: string) => {
+    const sb = getSupabase();
+    if (!sb) return;
+    setBusy(true);
+    const res = await activateSubscriptionTest(sb, planId);
+    setBusy(false);
+    if (!res.error) {
+      setPlan(planId as typeof plan);
+      setStatus("active");
+    }
+  };
+
+  const trialLeft = org?.trialEndsAt
+    ? Math.ceil(
+        (new Date(org.trialEndsAt).getTime() - Date.now()) / 86400000
+      )
+    : null;
+
+  const badge: Record<string, string> = {
+    active: "bg-green-100 text-green-700",
+    trialing: "bg-brand-soft text-brand-dark",
+    past_due: "bg-amber-100 text-amber-700",
+    canceled: "bg-slate-100 text-slate-600",
+    suspended: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold text-ink">Plan &amp; billing</h2>
+          <p className="text-xs text-ink-soft">
+            {status === "trialing" && trialLeft !== null
+              ? `Free trial — ${trialLeft > 0 ? `${trialLeft} days left` : "ended"}`
+              : `Your church is on the ${plan} plan.`}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+            badge[status] ?? "bg-slate-100"
+          }`}
+        >
+          {status}
+        </span>
+      </div>
+
+      <div className="grid gap-3 p-5 sm:grid-cols-3">
+        {PLANS.map((p) => {
+          const current = plan === p.id && status === "active";
+          return (
+            <div
+              key={p.id}
+              className={`rounded-xl border p-4 ${
+                current ? "border-brand ring-1 ring-brand" : "border-line"
+              }`}
+            >
+              <div className="font-bold text-ink">{p.name}</div>
+              <div className="mt-0.5 text-sm text-ink">
+                <span className="font-bold">{p.price}</span>{" "}
+                <span className="text-xs text-ink-soft">{p.cadence}</span>
+              </div>
+              <ul className="mt-3 space-y-1">
+                {p.features.slice(0, 3).map((f) => (
+                  <li
+                    key={f}
+                    className="flex items-start gap-1.5 text-xs text-ink-soft"
+                  >
+                    <Check size={12} className="mt-0.5 shrink-0 text-brand" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => activate(p.id)}
+                disabled={busy || current}
+                className={`mt-4 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition ${
+                  current
+                    ? "cursor-default bg-surface-2 text-ink-soft"
+                    : "bg-brand text-white hover:bg-brand-dark"
+                } disabled:opacity-60`}
+              >
+                {busy && <Loader2 size={14} className="animate-spin" />}
+                {current ? "Current plan" : `Choose ${p.name}`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="border-t border-line bg-surface-2 px-5 py-3 text-xs text-ink-soft">
+        <b>Test mode.</b> Choosing a plan activates it immediately without
+        collecting payment. Real checkout plugs in here when you&apos;re ready.
+      </p>
     </section>
   );
 }

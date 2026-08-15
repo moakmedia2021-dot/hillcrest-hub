@@ -4,13 +4,24 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase/client";
 import { createOrganization, joinOrganization } from "@/lib/supabase/data";
-import { Church, KeyRound, Loader2, LogOut, ArrowLeft } from "lucide-react";
+import { PLANS, type PlanId } from "@/lib/types";
+import {
+  Church,
+  KeyRound,
+  Loader2,
+  LogOut,
+  ArrowLeft,
+  Check,
+} from "lucide-react";
 
 // Shown to a signed-in account that doesn't belong to a church yet.
 export function ChurchOnboarding() {
   const { user, signOut, refreshUser } = useAuth();
-  const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
+  const [mode, setMode] = useState<"choose" | "create" | "plan" | "join">(
+    "choose"
+  );
   const [name, setName] = useState("");
+  const [plan, setPlan] = useState<PlanId>("starter");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +44,7 @@ export function ChurchOnboarding() {
   const create = () => {
     const sb = getSupabase();
     if (!sb || !name.trim()) return;
-    run(() => createOrganization(sb, name.trim()));
+    run(() => createOrganization(sb, name.trim(), plan));
   };
 
   const join = () => {
@@ -136,19 +147,87 @@ export function ChurchOnboarding() {
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && create()}
+                onKeyDown={(e) => e.key === "Enter" && name.trim() && setMode("plan")}
                 placeholder="e.g. Hillcrest Assembly of God"
                 className={field}
               />
               {error && <p className="text-sm text-danger">{error}</p>}
               <button
+                onClick={() => setMode("plan")}
+                disabled={!name.trim()}
+                className="w-full rounded-xl bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
+              >
+                Choose a plan
+              </button>
+            </div>
+          )}
+
+          {mode === "plan" && (
+            <div className="space-y-3">
+              <BackLink onClick={() => setMode("create")} />
+              <p className="eyebrow">Pick a plan</p>
+              <p className="text-sm text-ink-soft">
+                Every church starts with a <b>14-day free trial</b>. No card
+                needed to begin.
+              </p>
+
+              <div className="space-y-2.5">
+                {PLANS.map((p) => {
+                  const on = plan === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPlan(p.id)}
+                      className={`w-full rounded-xl border p-4 text-left transition ${
+                        on
+                          ? "border-brand bg-brand-soft/40 ring-1 ring-brand"
+                          : "border-line hover:bg-surface-2"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-ink">{p.name}</div>
+                          <div className="text-xs text-ink-soft">{p.blurb}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="font-bold text-ink">{p.price}</div>
+                          <div className="text-[11px] text-ink-soft">
+                            {p.cadence}
+                          </div>
+                        </div>
+                      </div>
+                      <ul className="mt-2.5 space-y-1">
+                        {p.features.map((f) => (
+                          <li
+                            key={f}
+                            className="flex items-start gap-1.5 text-xs text-ink-soft"
+                          >
+                            <Check
+                              size={12}
+                              className="mt-0.5 shrink-0 text-brand"
+                            />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {error && <p className="text-sm text-danger">{error}</p>}
+
+              <button
                 onClick={create}
-                disabled={busy || !name.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
+                disabled={busy}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
               >
                 {busy && <Loader2 size={15} className="animate-spin" />}
-                Create church
+                Start free trial
               </button>
+              <p className="text-center text-xs text-ink-soft">
+                Billing is in test mode — no payment is collected yet.
+              </p>
             </div>
           )}
         </div>
