@@ -2,13 +2,24 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, KanbanSquare, CalendarDays, MessagesSquare } from "lucide-react";
+import {
+  Bell,
+  KanbanSquare,
+  CalendarDays,
+  MessagesSquare,
+  CalendarCheck,
+} from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { buildNotifications } from "@/lib/notifications";
 
 const LASTREAD_KEY = "hillcrest-hub:lastread:v1";
-const ICON = { task: KanbanSquare, event: CalendarDays, chat: MessagesSquare };
+const ICON = {
+  task: KanbanSquare,
+  event: CalendarDays,
+  chat: MessagesSquare,
+  serving: CalendarCheck,
+};
 
 export function NotificationBell() {
   const { data } = useStore();

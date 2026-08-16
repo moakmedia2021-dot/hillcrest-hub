@@ -280,6 +280,41 @@ export interface Kudos {
   createdAt: string;
 }
 
+// One serving position on one date — the unit a roster is built from.
+export interface Assignment {
+  id: string;
+  date: string;
+  department: string;
+  position: string;
+  memberId?: string; // undefined = open slot
+  time?: string;
+  location?: string;
+  notes?: string;
+  published?: boolean;
+}
+
+export type SubStatusKind = "open" | "filled" | "cancelled";
+
+export interface SubRequest {
+  id: string;
+  assignmentId: string;
+  requestedById?: string;
+  reason?: string;
+  status: SubStatusKind;
+  filledById?: string;
+  createdAt: string;
+}
+
+// Common starting positions, offered when a lead builds a roster.
+export const POSITION_SUGGESTIONS: Record<string, string[]> = {
+  Creative: ["Camera 1", "Camera 2", "Livestream", "Photos", "Social"],
+  Worship: ["Worship Lead", "Keys", "Acoustic", "Bass", "Drums", "Vocals"],
+  Kids: ["Check-in", "Elementary Teacher", "Preschool", "Helper"],
+  Youth: ["Youth Lead", "Small Group", "Games", "Snacks"],
+  Hospitality: ["Greeter", "Coffee", "Usher", "Info Desk"],
+  Security: ["Lobby", "Parking", "Kids Wing"],
+};
+
 export interface AppData {
   org?: Organization; // the signed-in user's church
   members: Member[];
@@ -292,4 +327,6 @@ export interface AppData {
   availability: Availability[];
   rsvps: Rsvp[];
   kudos: Kudos[];
+  assignments: Assignment[];
+  subRequests: SubRequest[];
 }

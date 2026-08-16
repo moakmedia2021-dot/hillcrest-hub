@@ -20,6 +20,9 @@ import type {
   Rsvp,
   Kudos,
   RsvpStatus,
+  Assignment,
+  SubRequest,
+  SubStatusKind,
   Role,
   TaskStage,
   ResourceKind,
@@ -42,6 +45,8 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     rsvps,
     kudos,
     orgs,
+    assignments,
+    subReqs,
   ] = await Promise.all([
     sb.from("profiles").select("*").order("name"),
     sb.from("channels").select("*").order("created_at"),
@@ -58,6 +63,8 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     sb.from("kudos").select("*").order("created_at", { ascending: false }),
     // RLS returns only the caller's church.
     sb.from("organizations").select("*").limit(1),
+    sb.from("assignments").select("*").order("date"),
+    sb.from("sub_requests").select("*").order("created_at", { ascending: false }),
   ]);
 
   const orgRow = orgs.data?.[0];
@@ -196,6 +203,30 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
         createdAt: k.created_at,
       })
     ),
+    assignments: (assignments.data ?? []).map(
+      (a): Assignment => ({
+        id: a.id,
+        date: a.date,
+        department: a.department,
+        position: a.position,
+        memberId: a.member_id ?? undefined,
+        time: a.time ?? undefined,
+        location: a.location ?? undefined,
+        notes: a.notes ?? undefined,
+        published: a.published ?? false,
+      })
+    ),
+    subRequests: (subReqs.data ?? []).map(
+      (s): SubRequest => ({
+        id: s.id,
+        assignmentId: s.assignment_id,
+        requestedById: s.requested_by ?? undefined,
+        reason: s.reason ?? undefined,
+        status: (s.status as SubStatusKind) ?? "open",
+        filledById: s.filled_by ?? undefined,
+        createdAt: s.created_at,
+      })
+    ),
   };
 }
 
@@ -213,6 +244,8 @@ export function subscribe(sb: SupabaseClient, onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "availability" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "event_rsvps" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "kudos" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "assignments" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "sub_requests" }, onChange)
     .subscribe();
   return () => {
     sb.removeChannel(channel);
@@ -414,7 +447,67 @@ export const writes = {
 
   renameOrg: (sb: SupabaseClient, orgId: string, name: string) =>
     sb.from("organizations").update({ name }).eq("id", orgId),
+
+  addAssignment: (
+    sb: SupabaseClient,
+    a: Omit<Assignment, "id">
+  ) =>
+    sb.from("assignments").insert({
+      date: a.date,
+      department: a.department,
+      position: a.position,
+      member_id: a.memberId ?? null,
+      time: a.time ?? null,
+      location: a.location ?? null,
+      notes: a.notes ?? null,
+      published: a.published ?? false,
+    }),
+
+  setAssignmentMember: (
+    sb: SupabaseClient,
+    id: string,
+    memberId: string | null
+  ) => sb.from("assignments").update({ member_id: memberId }).eq("id", id),
+
+  deleteAssignment: (sb: SupabaseClient, id: string) =>
+    sb.from("assignments").delete().eq("id", id),
+
+  publishRoster: (sb: SupabaseClient, date: string, department: string) =>
+    sb
+      .from("assignments")
+      .update({ published: true })
+      .eq("date", date)
+      .eq("department", department),
 };
+
+// ── Sub / swap ───────────────────────────────────────────
+export async function requestSub(
+  sb: SupabaseClient,
+  assignmentId: string,
+  reason?: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("request_sub", {
+    assignment: assignmentId,
+    why: reason ?? null,
+  });
+  return { error: error?.message };
+}
+
+export async function acceptSubRequest(
+  sb: SupabaseClient,
+  reqId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("accept_sub_request", { req_id: reqId });
+  return { error: error?.message };
+}
+
+export async function cancelSubRequest(
+  sb: SupabaseClient,
+  reqId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("cancel_sub_request", { req_id: reqId });
+  return { error: error?.message };
+}
 
 // ── Starting or joining a church ─────────────────────────
 export async function createOrganization(

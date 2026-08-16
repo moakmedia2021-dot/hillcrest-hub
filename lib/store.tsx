@@ -27,6 +27,7 @@ import type {
   EventTemplate,
   Resource,
   RsvpStatus,
+  Assignment,
 } from "./types";
 import { SUPABASE_ENABLED } from "./supabase/config";
 import { getSupabase } from "./supabase/client";
@@ -99,6 +100,11 @@ interface StoreValue {
   // resources
   addResource: (r: Omit<Resource, "id" | "createdAt">) => void;
   deleteResource: (id: string) => void;
+  // rosters
+  addAssignment: (a: Omit<Assignment, "id">) => void;
+  setAssignmentMember: (id: string, memberId: string | null) => void;
+  deleteAssignment: (id: string) => void;
+  publishRoster: (date: string, department: string) => void;
   // serving / rsvps / kudos
   toggleAvailability: (memberId: string, date: string, on: boolean) => void;
   setRsvp: (eventId: string, memberId: string, status: RsvpStatus) => void;
@@ -312,6 +318,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData((d) => ({
           ...d,
           resources: d.resources.filter((r) => r.id !== id),
+        }));
+      },
+      addAssignment: (a) => {
+        const sb = live();
+        if (sb) {
+          fire(writes.addAssignment(sb, a));
+        } else {
+          setData((d) => ({
+            ...d,
+            assignments: [...d.assignments, { ...a, id: uid() }],
+          }));
+        }
+      },
+      setAssignmentMember: (id, memberId) => {
+        const sb = live();
+        if (sb) fire(writes.setAssignmentMember(sb, id, memberId));
+        setData((d) => ({
+          ...d,
+          assignments: d.assignments.map((a) =>
+            a.id === id ? { ...a, memberId: memberId ?? undefined } : a
+          ),
+        }));
+      },
+      deleteAssignment: (id) => {
+        const sb = live();
+        if (sb) fire(writes.deleteAssignment(sb, id));
+        setData((d) => ({
+          ...d,
+          assignments: d.assignments.filter((a) => a.id !== id),
+        }));
+      },
+      publishRoster: (date, department) => {
+        const sb = live();
+        if (sb) fire(writes.publishRoster(sb, date, department));
+        setData((d) => ({
+          ...d,
+          assignments: d.assignments.map((a) =>
+            a.date === date && a.department === department
+              ? { ...a, published: true }
+              : a
+          ),
         }));
       },
       toggleAvailability: (memberId, date, on) => {

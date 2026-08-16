@@ -383,6 +383,16 @@ export const SEED: AppData = {
     { eventId: "ev_youth", memberId: "u_james", status: "maybe" },
   ],
 
+  assignments: [
+    { id: "a1", date: daysFromNow(4), department: "Creative", position: "Camera 1", memberId: "u_james", time: "9:00 AM", location: "Main Auditorium", published: true },
+    { id: "a2", date: daysFromNow(4), department: "Creative", position: "Livestream", memberId: "u_grace", time: "9:00 AM", location: "Booth", published: true },
+    { id: "a3", date: daysFromNow(4), department: "Creative", position: "Photos", time: "9:00 AM", location: "Lobby", published: true },
+    { id: "a4", date: daysFromNow(4), department: "Worship", position: "Worship Lead", memberId: "u_david", time: "8:00 AM", location: "Stage", published: true },
+    { id: "a5", date: daysFromNow(11), department: "Creative", position: "Camera 1", memberId: "u_malachi", time: "9:00 AM", published: true },
+  ],
+
+  subRequests: [],
+
   kudos: [
     {
       id: "k1",

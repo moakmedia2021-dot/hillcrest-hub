@@ -14,6 +14,7 @@ import {
   CalendarRange,
   CalendarDays,
   CalendarCheck,
+  ClipboardList,
   Award,
   BookOpen,
   Mail,
@@ -89,7 +90,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         { href: "/schedule", label: "Production Schedule", icon: KanbanSquare },
         { href: "/events", label: "Events", icon: CalendarRange },
         { href: "/calendar", label: "Calendar", icon: CalendarDays },
-        { href: "/serving", label: "Serving", icon: CalendarCheck },
+        { href: "/my-sunday", label: "My Sunday", icon: CalendarCheck },
+        { href: "/serving", label: "My Availability", icon: CalendarDays },
       ],
     },
     {
@@ -106,6 +108,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ],
     },
   ];
+
+  // Leads build the roster; everyone else just sees their own schedule.
+  if (can("manage_schedule"))
+    groups[1].items.push({
+      href: "/roster",
+      label: "Roster Builder",
+      icon: ClipboardList,
+    });
 
   const leadership: Item[] = [];
   if (can("manage_schedule"))

@@ -3,7 +3,7 @@ import { dueMeta } from "./format";
 
 export interface Notif {
   id: string;
-  icon: "task" | "event" | "chat";
+  icon: "task" | "event" | "chat" | "serving";
   text: string;
   href: string;
   urgent?: boolean;
@@ -50,6 +50,43 @@ export function buildNotifications(
         href: `/events/${e.id}`,
         urgent: days <= 1,
       });
+  }
+
+  // Serving: my next assignment within a week
+  const todayIso = new Date().toISOString().slice(0, 10);
+  for (const a of data.assignments) {
+    if (a.memberId !== user.id || a.date < todayIso) continue;
+    const days = Math.round(
+      (new Date(a.date + "T12:00:00").getTime() -
+        new Date(todayIso + "T12:00:00").getTime()) /
+        86400000
+    );
+    if (days > 7) continue;
+    out.push({
+      id: "s" + a.id,
+      icon: "serving",
+      text: `You're serving ${a.position} — ${
+        days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`
+      }`,
+      href: "/my-sunday",
+      urgent: days <= 1,
+    });
+  }
+
+  // Serving: open sub requests my department could cover
+  for (const s of data.subRequests) {
+    if (s.status !== "open") continue;
+    const a = data.assignments.find((x) => x.id === s.assignmentId);
+    if (!a || a.date < todayIso || a.memberId === user.id) continue;
+    if (a.department !== user.department && user.role !== "admin") continue;
+    out.push({
+      id: "sr" + s.id,
+      icon: "serving",
+      text: `${a.position} needs cover on ${new Date(
+        a.date + "T12:00:00"
+      ).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+      href: "/my-sunday",
+    });
   }
 
   // Unread chats
