@@ -9,9 +9,11 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -60,15 +62,23 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const live = () => (SUPABASE_ENABLED ? getSupabase() : null);
 
 // supabase-js query builders are LAZY: the HTTP request only runs when the
-// builder is awaited/then'd. fire() forces execution and surfaces any error,
-// so fire-and-forget writes actually persist.
-function fire(p: PromiseLike<unknown>) {
+// builder is awaited/then'd. fire() forces execution, surfaces errors, and —
+// critically — refetches as soon as the write lands.
+//
+// Inserts can't be optimistic (the database mints the id), so without this
+// refetch the person who clicked sees nothing until realtime happens to
+// deliver the row. Waiting on realtime for your OWN action feels broken.
+function fire(p: PromiseLike<unknown>, done?: () => void) {
   Promise.resolve(p).then(
     (r) => {
       const err = (r as { error?: unknown } | null)?.error;
       if (err) console.error("[hub write]", err);
+      done?.();
     },
-    (e) => console.error("[hub write]", e)
+    (e) => {
+      console.error("[hub write]", e);
+      done?.();
+    },
   );
 }
 
@@ -80,7 +90,7 @@ interface StoreValue {
     channelId: string,
     authorId: string,
     body: string,
-    imageUrl?: string
+    imageUrl?: string,
   ) => void;
   deleteMessage: (messageId: string, byId: string) => void;
   // tasks
@@ -96,9 +106,15 @@ interface StoreValue {
     patch: Partial<
       Pick<
         Member,
-        "name" | "username" | "title" | "department" | "phone" | "bio" | "avatarUrl"
+        | "name"
+        | "username"
+        | "title"
+        | "department"
+        | "phone"
+        | "bio"
+        | "avatarUrl"
       >
-    >
+    >,
   ) => void;
   approveMember: (memberId: string, approved: boolean) => void;
   setStaffFlag: (memberId: string, isStaff: boolean) => void;
@@ -164,7 +180,7 @@ interface StoreValue {
   assignEventTask: (
     eventId: string,
     taskId: string,
-    assigneeId: string
+    assigneeId: string,
   ) => void;
   reset: () => void;
 }
@@ -175,12 +191,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(SEED);
   const [hydrated, setHydrated] = useState(false);
 
+  // Refetch shortly after any write so the person who clicked sees the result
+  // immediately. Debounced so a burst of writes causes one reload.
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncNow = useCallback(() => {
+    const sb = SUPABASE_ENABLED ? getSupabase() : null;
+    if (!sb) return;
+    if (pending.current) clearTimeout(pending.current);
+    pending.current = setTimeout(() => {
+      loadAll(sb)
+        .then(setData)
+        .catch(() => {});
+    }, 120);
+  }, []);
+
   // Hydrate after mount. Supabase mode loads live data + subscribes to
   // realtime; demo mode reads localStorage. (avoids SSR mismatch either way)
   useEffect(() => {
     const sb = SUPABASE_ENABLED ? getSupabase() : null;
     if (sb) {
-      const refresh = () => loadAll(sb).then(setData).catch(() => {});
+      const refresh = () =>
+        loadAll(sb)
+          .then(setData)
+          .catch(() => {});
       // Realtime: reload when the live tables change.
       const realtimeUnsub = subscribe(sb, refresh);
       // Reload whenever auth resolves or changes (initial session, sign in,
@@ -217,7 +250,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       data,
       refresh: () => {
         const sb = live();
-        if (sb) loadAll(sb).then(setData).catch(() => {});
+        if (sb)
+          loadAll(sb)
+            .then(setData)
+            .catch(() => {});
       },
       sendMessage: (channelId, authorId, body, imageUrl) => {
         // Optimistic in both modes so the sender sees their message instantly.
@@ -234,11 +270,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData((d) => ({ ...d, messages: [...d.messages, msg] }));
         const sb = live();
         if (sb)
-          fire(writes.sendMessage(sb, channelId, authorId, body.trim(), imageUrl));
+          fire(
+            writes.sendMessage(sb, channelId, authorId, body.trim(), imageUrl),
+            syncNow,
+          );
       },
       deleteMessage: (messageId, byId) => {
         const sb = live();
-        if (sb) fire(writes.deleteMessage(sb, messageId));
+        if (sb) fire(writes.deleteMessage(sb, messageId), syncNow);
         // Optimistic soft-delete: blank the body, keep the original so admins
         // can still reveal it (non-admins never receive it from the server).
         setData((d) => ({
@@ -252,7 +291,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   originalBody: m.originalBody ?? m.body,
                   body: "",
                 }
-              : m
+              : m,
           ),
         }));
       },
@@ -264,11 +303,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         setData((d) => ({ ...d, tasks: [task, ...d.tasks] }));
         const sb = live();
-        if (sb) fire(writes.addTask(sb, t));
+        if (sb) fire(writes.addTask(sb, t), syncNow);
       },
       moveTask: (taskId, stage) => {
         const sb = live();
-        if (sb) fire(writes.moveTask(sb, taskId, stage));
+        if (sb) fire(writes.moveTask(sb, taskId, stage), syncNow);
         setData((d) => ({
           ...d,
           tasks: d.tasks.map((t) => (t.id === taskId ? { ...t, stage } : t)),
@@ -281,7 +320,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       deleteTask: (taskId) => {
         const sb = live();
-        if (sb) fire(writes.deleteTask(sb, taskId));
+        if (sb) fire(writes.deleteTask(sb, taskId), syncNow);
         setData((d) => ({
           ...d,
           tasks: d.tasks.filter((t) => t.id !== taskId),
@@ -289,21 +328,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       setMemberRole: (memberId, role) => {
         const sb = live();
-        if (sb) fire(writes.setMemberRole(sb, memberId, role));
+        if (sb) fire(writes.setMemberRole(sb, memberId, role), syncNow);
         setData((d) => ({
           ...d,
           members: d.members.map((m) =>
-            m.id === memberId ? { ...m, role } : m
+            m.id === memberId ? { ...m, role } : m,
           ),
         }));
       },
       setMemberDepartment: (memberId, department) => {
         const sb = live();
-        if (sb) fire(writes.updateProfile(sb, memberId, { department }));
+        if (sb)
+          fire(writes.updateProfile(sb, memberId, { department }), syncNow);
         setData((d) => ({
           ...d,
           members: d.members.map((m) =>
-            m.id === memberId ? { ...m, department } : m
+            m.id === memberId ? { ...m, department } : m,
           ),
         }));
       },
@@ -319,39 +359,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               phone: patch.phone,
               bio: patch.bio,
               avatar_url: patch.avatarUrl,
-            })
+            }),
+            syncNow,
           );
         setData((d) => ({
           ...d,
           members: d.members.map((m) =>
-            m.id === memberId ? { ...m, ...patch } : m
+            m.id === memberId ? { ...m, ...patch } : m,
           ),
         }));
       },
       approveMember: (memberId, approved) => {
         const sb = live();
-        if (sb) fire(writes.approveMember(sb, memberId, approved));
+        if (sb) fire(writes.approveMember(sb, memberId, approved), syncNow);
         setData((d) => ({
           ...d,
           members: d.members.map((m) =>
-            m.id === memberId ? { ...m, approved } : m
+            m.id === memberId ? { ...m, approved } : m,
           ),
         }));
       },
       setStaffFlag: (memberId, isStaff) => {
         const sb = live();
-        if (sb) fire(writes.setStaffFlag(sb, memberId, isStaff));
+        if (sb) fire(writes.setStaffFlag(sb, memberId, isStaff), syncNow);
         setData((d) => ({
           ...d,
           members: d.members.map((m) =>
-            m.id === memberId ? { ...m, isStaff } : m
+            m.id === memberId ? { ...m, isStaff } : m,
           ),
         }));
       },
       addResource: (r) => {
         const sb = live();
         if (sb) {
-          fire(writes.addResource(sb, r));
+          fire(writes.addResource(sb, r), syncNow);
         } else {
           setData((d) => ({
             ...d,
@@ -364,7 +405,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       deleteResource: (id) => {
         const sb = live();
-        if (sb) fire(writes.deleteResource(sb, id));
+        if (sb) fire(writes.deleteResource(sb, id), syncNow);
         setData((d) => ({
           ...d,
           resources: d.resources.filter((r) => r.id !== id),
@@ -375,18 +416,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!clean) return;
         const sb = live();
         if (sb) {
-          fire(writes.addDepartment(sb, clean));
+          fire(writes.addDepartment(sb, clean), syncNow);
         } else {
           setData((d) =>
             d.departments.some((x) => x.name === clean)
               ? d
-              : { ...d, departments: [...d.departments, { id: uid(), name: clean }] }
+              : {
+                  ...d,
+                  departments: [...d.departments, { id: uid(), name: clean }],
+                },
           );
         }
       },
       deleteDepartment: (id) => {
         const sb = live();
-        if (sb) fire(writes.deleteDepartment(sb, id));
+        if (sb) fire(writes.deleteDepartment(sb, id), syncNow);
         setData((d) => ({
           ...d,
           departments: d.departments.filter((x) => x.id !== id),
@@ -395,7 +439,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addMeeting: (m) => {
         const sb = live();
         if (sb) {
-          fire(writes.addMeeting(sb, m));
+          fire(writes.addMeeting(sb, m), syncNow);
         } else {
           setData((d) => ({
             ...d,
@@ -408,7 +452,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       setMeetingNotes: (id, notes) => {
         const sb = live();
-        if (sb) fire(writes.setMeetingNotes(sb, id, notes));
+        if (sb) fire(writes.setMeetingNotes(sb, id, notes), syncNow);
         setData((d) => ({
           ...d,
           meetings: d.meetings.map((m) => (m.id === id ? { ...m, notes } : m)),
@@ -416,7 +460,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       deleteMeeting: (id) => {
         const sb = live();
-        if (sb) fire(writes.deleteMeeting(sb, id));
+        if (sb) fire(writes.deleteMeeting(sb, id), syncNow);
         setData((d) => ({
           ...d,
           meetings: d.meetings.filter((m) => m.id !== id),
@@ -427,30 +471,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!clean) return;
         const sb = live();
         if (sb) {
-          fire(writes.addAgendaItem(sb, meetingId, clean, addedBy));
+          fire(writes.addAgendaItem(sb, meetingId, clean, addedBy), syncNow);
         } else {
           setData((d) => ({
             ...d,
             agendaItems: [
               ...d.agendaItems,
-              { id: uid(), meetingId, text: clean, addedById: addedBy, discussed: false },
+              {
+                id: uid(),
+                meetingId,
+                text: clean,
+                addedById: addedBy,
+                discussed: false,
+              },
             ],
           }));
         }
       },
       setAgendaDiscussed: (id, discussed) => {
         const sb = live();
-        if (sb) fire(writes.setAgendaDiscussed(sb, id, discussed));
+        if (sb) fire(writes.setAgendaDiscussed(sb, id, discussed), syncNow);
         setData((d) => ({
           ...d,
           agendaItems: d.agendaItems.map((a) =>
-            a.id === id ? { ...a, discussed } : a
+            a.id === id ? { ...a, discussed } : a,
           ),
         }));
       },
       deleteAgendaItem: (id) => {
         const sb = live();
-        if (sb) fire(writes.deleteAgendaItem(sb, id));
+        if (sb) fire(writes.deleteAgendaItem(sb, id), syncNow);
         setData((d) => ({
           ...d,
           agendaItems: d.agendaItems.filter((a) => a.id !== id),
@@ -459,7 +509,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addActionItem: (a) => {
         const sb = live();
         if (sb) {
-          fire(writes.addActionItem(sb, a));
+          fire(writes.addActionItem(sb, a), syncNow);
         } else {
           setData((d) => ({
             ...d,
@@ -469,17 +519,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       setActionDone: (id, done) => {
         const sb = live();
-        if (sb) fire(writes.setActionDone(sb, id, done));
+        if (sb) fire(writes.setActionDone(sb, id, done), syncNow);
         setData((d) => ({
           ...d,
           actionItems: d.actionItems.map((a) =>
-            a.id === id ? { ...a, done } : a
+            a.id === id ? { ...a, done } : a,
           ),
         }));
       },
       deleteActionItem: (id) => {
         const sb = live();
-        if (sb) fire(writes.deleteActionItem(sb, id));
+        if (sb) fire(writes.deleteActionItem(sb, id), syncNow);
         setData((d) => ({
           ...d,
           actionItems: d.actionItems.filter((a) => a.id !== id),
@@ -490,7 +540,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!clean) return;
         const sb = live();
         if (sb) {
-          fire(writes.addGoal(sb, memberId, clean));
+          fire(writes.addGoal(sb, memberId, clean), syncNow);
         } else {
           setData((d) => ({
             ...d,
@@ -503,7 +553,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       setGoalStatus: (id, status) => {
         const sb = live();
-        if (sb) fire(writes.setGoalStatus(sb, id, status));
+        if (sb) fire(writes.setGoalStatus(sb, id, status), syncNow);
         setData((d) => ({
           ...d,
           goals: d.goals.map((g) => (g.id === id ? { ...g, status } : g)),
@@ -512,7 +562,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addAssignment: (a) => {
         const sb = live();
         if (sb) {
-          fire(writes.addAssignment(sb, a));
+          fire(writes.addAssignment(sb, a), syncNow);
         } else {
           setData((d) => ({
             ...d,
@@ -522,17 +572,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       setAssignmentMember: (id, memberId) => {
         const sb = live();
-        if (sb) fire(writes.setAssignmentMember(sb, id, memberId));
+        if (sb) fire(writes.setAssignmentMember(sb, id, memberId), syncNow);
         setData((d) => ({
           ...d,
           assignments: d.assignments.map((a) =>
-            a.id === id ? { ...a, memberId: memberId ?? undefined } : a
+            a.id === id ? { ...a, memberId: memberId ?? undefined } : a,
           ),
         }));
       },
       deleteAssignment: (id) => {
         const sb = live();
-        if (sb) fire(writes.deleteAssignment(sb, id));
+        if (sb) fire(writes.deleteAssignment(sb, id), syncNow);
         setData((d) => ({
           ...d,
           assignments: d.assignments.filter((a) => a.id !== id),
@@ -541,37 +591,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       publishRoster: (date, department) => {
         const sb = live();
         if (sb) {
-          fire(writes.publishRoster(sb, date, department));
+          fire(writes.publishRoster(sb, date, department), syncNow);
           // Everyone on the roster gets a "you're serving" reminder.
-          fire(notifyRoster(sb, date, department));
+          fire(notifyRoster(sb, date, department), syncNow);
         }
         setData((d) => ({
           ...d,
           assignments: d.assignments.map((a) =>
             a.date === date && a.department === department
               ? { ...a, published: true }
-              : a
+              : a,
           ),
         }));
       },
       toggleAvailability: (memberId, date, on) => {
         const sb = live();
-        if (sb) fire(writes.setAvailability(sb, memberId, date, on));
+        if (sb) fire(writes.setAvailability(sb, memberId, date, on), syncNow);
         setData((d) => {
           const rest = d.availability.filter(
-            (a) => !(a.memberId === memberId && a.date === date)
+            (a) => !(a.memberId === memberId && a.date === date),
           );
-          return { ...d, availability: on ? [...rest, { memberId, date }] : rest };
+          return {
+            ...d,
+            availability: on ? [...rest, { memberId, date }] : rest,
+          };
         });
       },
       setRsvp: (eventId, memberId, status) => {
         const sb = live();
-        if (sb) fire(writes.setRsvp(sb, eventId, memberId, status));
+        if (sb) fire(writes.setRsvp(sb, eventId, memberId, status), syncNow);
         setData((d) => ({
           ...d,
           rsvps: [
             ...d.rsvps.filter(
-              (r) => !(r.eventId === eventId && r.memberId === memberId)
+              (r) => !(r.eventId === eventId && r.memberId === memberId),
             ),
             { eventId, memberId, status },
           ],
@@ -579,11 +632,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       giveKudos: (fromId, toId, message) => {
         const sb = live();
-        if (sb) fire(writes.giveKudos(sb, fromId, toId, message));
+        if (sb) fire(writes.giveKudos(sb, fromId, toId, message), syncNow);
         setData((d) => ({
           ...d,
           kudos: [
-            { id: uid(), fromId, toId, message, createdAt: new Date().toISOString() },
+            {
+              id: uid(),
+              fromId,
+              toId,
+              message,
+              createdAt: new Date().toISOString(),
+            },
             ...d.kudos,
           ],
         }));
@@ -598,7 +657,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (sb) {
           const res = await writes.createChannel(sb, input);
           // Channels aren't optimistic; pull the real channel + membership.
-          loadAll(sb).then(setData).catch(() => {});
+          loadAll(sb)
+            .then(setData)
+            .catch(() => {});
           return res.id;
         }
         const id = uid();
@@ -606,14 +667,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           channels: [
             ...d.channels,
-            { id, name: input.name, kind: input.kind as Channel["kind"], memberIds: input.memberIds },
+            {
+              id,
+              name: input.name,
+              kind: input.kind as Channel["kind"],
+              memberIds: input.memberIds,
+            },
           ],
         }));
         return id;
       },
       clearChat: (channelId) => {
         const sb = live();
-        if (sb) fire(writes.clearChannel(sb, channelId));
+        if (sb) fire(writes.clearChannel(sb, channelId), syncNow);
         setData((d) => ({
           ...d,
           messages: d.messages.filter((m) => m.channelId !== channelId),
@@ -621,25 +687,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       addChannelMember: (channelId, memberId) => {
         const sb = live();
-        if (sb) fire(writes.addChannelMember(sb, channelId, memberId));
+        if (sb) fire(writes.addChannelMember(sb, channelId, memberId), syncNow);
         setData((d) => ({
           ...d,
           channels: d.channels.map((c) =>
             c.id === channelId && !c.memberIds.includes(memberId)
               ? { ...c, memberIds: [...c.memberIds, memberId] }
-              : c
+              : c,
           ),
         }));
       },
       removeChannelMember: (channelId, memberId) => {
         const sb = live();
-        if (sb) fire(writes.removeChannelMember(sb, channelId, memberId));
+        if (sb)
+          fire(writes.removeChannelMember(sb, channelId, memberId), syncNow);
         setData((d) => ({
           ...d,
           channels: d.channels.map((c) =>
             c.id === channelId
               ? { ...c, memberIds: c.memberIds.filter((m) => m !== memberId) }
-              : c
+              : c,
           ),
         }));
       },
@@ -672,7 +739,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString(),
         };
         const sb = live();
-        if (sb) fire(writes.createEvent(sb, event));
+        if (sb) fire(writes.createEvent(sb, event), syncNow);
         setData((d) => ({ ...d, events: [...d.events, event] }));
         return id;
       },
@@ -680,12 +747,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData((d) => ({
           ...d,
           events: d.events.map((e) =>
-            e.id === eventId ? { ...e, ...patch } : e
+            e.id === eventId ? { ...e, ...patch } : e,
           ),
         })),
       deleteEvent: (eventId) => {
         const sb = live();
-        if (sb) fire(writes.deleteEvent(sb, eventId));
+        if (sb) fire(writes.deleteEvent(sb, eventId), syncNow);
         setData((d) => ({
           ...d,
           events: d.events.filter((e) => e.id !== eventId),
@@ -697,7 +764,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const cur = data.events
             .find((e) => e.id === eventId)
             ?.tasks.find((t) => t.id === taskId);
-          if (cur) fire(writes.toggleEventTask(sb, taskId, !cur.done));
+          if (cur) fire(writes.toggleEventTask(sb, taskId, !cur.done), syncNow);
         }
         setData((d) => ({
           ...d,
@@ -706,16 +773,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? {
                   ...e,
                   tasks: e.tasks.map((t) =>
-                    t.id === taskId ? { ...t, done: !t.done } : t
+                    t.id === taskId ? { ...t, done: !t.done } : t,
                   ),
                 }
-              : e
+              : e,
           ),
         }));
       },
       assignEventTask: (eventId, taskId, assigneeId) => {
         const sb = live();
-        if (sb) fire(writes.assignEventTask(sb, taskId, assigneeId));
+        if (sb) fire(writes.assignEventTask(sb, taskId, assigneeId), syncNow);
         setData((d) => ({
           ...d,
           events: d.events.map((e) =>
@@ -723,10 +790,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? {
                   ...e,
                   tasks: e.tasks.map((t) =>
-                    t.id === taskId ? { ...t, assigneeId } : t
+                    t.id === taskId ? { ...t, assigneeId } : t,
                   ),
                 }
-              : e
+              : e,
           ),
         }));
       },
@@ -735,7 +802,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData(SEED);
       },
     }),
-    [data]
+    [data],
   );
 
   return (
@@ -757,6 +824,6 @@ export function useMember(id?: string): Member | undefined {
 
 export function channelsForMember(data: AppData, memberId: string): Channel[] {
   return data.channels.filter(
-    (c) => c.memberIds.includes("*") || c.memberIds.includes(memberId)
+    (c) => c.memberIds.includes("*") || c.memberIds.includes(memberId),
   );
 }

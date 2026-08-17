@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -27,11 +33,46 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [lastRead, setLastRead] = useState<Record<string, string>>({});
 
+  // The bell lives in a 256px sidebar, so an absolutely-positioned 320px panel
+  // hangs off the screen. Position it fixed and clamp it to the viewport
+  // instead — same code path works in the mobile header.
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 320, maxH: 400 });
+
+  const place = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const width = Math.min(320, vw - pad * 2);
+    const top = r.bottom + 6;
+    setPos({
+      top,
+      // Prefer right-aligned to the bell, but never past either edge.
+      left: Math.min(Math.max(r.right - width, pad), vw - width - pad),
+      width,
+      maxH: Math.max(180, vh - top - pad),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, place]);
+
   useEffect(() => {
     const read = () => {
       try {
         setLastRead(
-          JSON.parse(window.localStorage.getItem(LASTREAD_KEY) || "{}")
+          JSON.parse(window.localStorage.getItem(LASTREAD_KEY) || "{}"),
         );
       } catch {
         /* ignore */
@@ -49,6 +90,7 @@ export function NotificationBell() {
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-lg p-2 text-ink-soft hover:bg-surface-2"
         title="Notifications"
@@ -64,7 +106,10 @@ export function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-40 mt-1 w-80 max-w-[85vw] rounded-2xl border border-line bg-surface shadow-xl">
+          <div
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
+            className="fixed z-40 overflow-hidden rounded-2xl border border-line bg-surface shadow-xl"
+          >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <span className="font-bold text-ink">Notifications</span>
               <span className="text-xs text-ink-soft">{notifs.length}</span>
@@ -74,7 +119,10 @@ export function NotificationBell() {
                 You&apos;re all caught up. 🎉
               </p>
             ) : (
-              <ul className="max-h-96 divide-y divide-line overflow-y-auto">
+              <ul
+                style={{ maxHeight: pos.maxH - 49 }}
+                className="divide-y divide-line overflow-y-auto"
+              >
                 {notifs.map((n) => {
                   const Icon = ICON[n.icon];
                   return (

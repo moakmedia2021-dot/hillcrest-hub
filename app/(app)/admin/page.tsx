@@ -261,7 +261,7 @@ export default function AdminPage() {
 
 // Admins share this code so their team can join the right church.
 function InviteCard() {
-  const { data } = useStore();
+  const { data, refresh } = useStore();
   const [code, setCode] = useState(data.org?.inviteCode ?? "");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -281,12 +281,13 @@ function InviteCard() {
     if (!sb) return;
     if (
       !confirm(
-        "Generate a new invite code? The old one stops working immediately."
+        "Generate a new invite code? The old one stops working immediately.",
       )
     )
       return;
     setBusy(true);
     const res = await regenerateInviteCode(sb);
+    refresh();
     setBusy(false);
     if (res.code) setCode(res.code);
   };
@@ -339,7 +340,7 @@ function MemberActions({ member }: { member: Member }) {
     if (
       remove &&
       !confirm(
-        `Remove ${member.name} from the church? They lose access immediately. Their chat history and past serving stay, and you can restore them later.`
+        `Remove ${member.name} from the church? They lose access immediately. Their chat history and past serving stay, and you can restore them later.`,
       )
     )
       return;
@@ -356,7 +357,11 @@ function MemberActions({ member }: { member: Member }) {
         disabled={busy}
         className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft disabled:opacity-50"
       >
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+        {busy ? (
+          <Loader2 size={13} className="animate-spin" />
+        ) : (
+          <RotateCcw size={13} />
+        )}
         Restore
       </button>
     );
@@ -368,7 +373,11 @@ function MemberActions({ member }: { member: Member }) {
       className="rounded-lg border border-line p-2 text-ink-soft hover:border-danger/40 hover:bg-red-50 hover:text-danger disabled:opacity-50"
       title={`Remove ${member.name} from the church`}
     >
-      {busy ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
+      {busy ? (
+        <Loader2 size={14} className="animate-spin" />
+      ) : (
+        <UserMinus size={14} />
+      )}
     </button>
   );
 }
@@ -444,7 +453,7 @@ function DepartmentsCard() {
 
 // Plan + subscription state for this church. Payment is stubbed in test mode.
 function BillingCard() {
-  const { data } = useStore();
+  const { data, refresh } = useStore();
   const org = data.org;
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(org?.status ?? "trialing");
@@ -455,6 +464,7 @@ function BillingCard() {
     if (!sb) return;
     setBusy(true);
     const res = await activateSubscriptionTest(sb, planId);
+    refresh();
     setBusy(false);
     if (!res.error) {
       setPlan(planId as typeof plan);
@@ -463,9 +473,7 @@ function BillingCard() {
   };
 
   const trialLeft = org?.trialEndsAt
-    ? Math.ceil(
-        (new Date(org.trialEndsAt).getTime() - Date.now()) / 86400000
-      )
+    ? Math.ceil((new Date(org.trialEndsAt).getTime() - Date.now()) / 86400000)
     : null;
 
   const badge: Record<string, string> = {

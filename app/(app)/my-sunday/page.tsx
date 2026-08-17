@@ -37,7 +37,7 @@ function daysAway(iso: string) {
   const diff = Math.round(
     (new Date(iso + "T12:00:00").getTime() -
       new Date(todayIso() + "T12:00:00").getTime()) /
-      86400000
+      86400000,
   );
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
@@ -45,7 +45,7 @@ function daysAway(iso: string) {
 }
 
 export default function MySundayPage() {
-  const { data } = useStore();
+  const { data, refresh } = useStore();
   const { user } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,7 +63,9 @@ export default function MySundayPage() {
   const later = mine.slice(1);
 
   const openSubIds = new Set(
-    data.subRequests.filter((s) => s.status === "open").map((s) => s.assignmentId)
+    data.subRequests
+      .filter((s) => s.status === "open")
+      .map((s) => s.assignmentId),
   );
 
   // Open sub requests I could cover — my department, not my own slot.
@@ -80,7 +82,7 @@ export default function MySundayPage() {
         x.a.memberId !== user.id &&
         (x.a.department === user.department ||
           user.role === "admin" ||
-          user.role === "lead")
+          user.role === "lead"),
     );
 
   const flash = (m: string) => {
@@ -93,6 +95,7 @@ export default function MySundayPage() {
     if (!sb) return flash("Sub requests need the live database.");
     setBusy(assignmentId);
     const res = await requestSub(sb, assignmentId, reason.trim() || undefined);
+    refresh();
     setBusy(null);
     setAsking(null);
     setReason("");
@@ -104,6 +107,7 @@ export default function MySundayPage() {
     if (!sb) return flash("Needs the live database.");
     setBusy(reqId);
     const res = await acceptSubRequest(sb, reqId);
+    refresh();
     setBusy(null);
     flash(res.error ?? "You've got it — thanks for covering!");
   };
@@ -113,6 +117,7 @@ export default function MySundayPage() {
     if (!sb) return;
     setBusy(reqId);
     await cancelSubRequest(sb, reqId);
+    refresh();
     setBusy(null);
     flash("Sub request withdrawn.");
   };
@@ -120,7 +125,8 @@ export default function MySundayPage() {
   const teammates = (a: (typeof mine)[number]) =>
     data.assignments
       .filter(
-        (x) => x.date === a.date && x.department === a.department && x.id !== a.id
+        (x) =>
+          x.date === a.date && x.department === a.department && x.id !== a.id,
       )
       .map((x) => ({ x, m: data.members.find((m) => m.id === x.memberId) }));
 
@@ -227,7 +233,7 @@ export default function MySundayPage() {
                   </span>
                   {(() => {
                     const req = data.subRequests.find(
-                      (s) => s.assignmentId === next.id && s.status === "open"
+                      (s) => s.assignmentId === next.id && s.status === "open",
                     );
                     return req ? (
                       <button
@@ -361,7 +367,9 @@ export default function MySundayPage() {
           ) : (
             <ul className="divide-y divide-line">
               {coverable.map(({ req, a }) => {
-                const who = data.members.find((m) => m.id === req.requestedById);
+                const who = data.members.find(
+                  (m) => m.id === req.requestedById,
+                );
                 return (
                   <li
                     key={req.id}
@@ -372,7 +380,9 @@ export default function MySundayPage() {
                         {a!.position} · {prettyDate(a!.date)}
                       </div>
                       <div className="text-xs text-ink-soft">
-                        {who ? `${who.name.split(" ")[0]} can't make it` : "Open slot"}
+                        {who
+                          ? `${who.name.split(" ")[0]} can't make it`
+                          : "Open slot"}
                         {req.reason ? ` — ${req.reason}` : ""}
                       </div>
                     </div>

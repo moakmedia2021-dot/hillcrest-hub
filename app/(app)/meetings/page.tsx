@@ -111,14 +111,16 @@ export default function MeetingsPage() {
                 {list.map((m) => {
                   const partner = data.members.find(
                     (x) =>
-                      x.id === (m.withId === user.id ? m.ownerId : m.withId)
+                      x.id === (m.withId === user.id ? m.ownerId : m.withId),
                   );
                   return (
                     <li key={m.id}>
                       <button
                         onClick={() => setOpenId(m.id)}
                         className={`w-full px-5 py-3 text-left transition ${
-                          open?.id === m.id ? "bg-brand-soft" : "hover:bg-surface-2"
+                          open?.id === m.id
+                            ? "bg-brand-soft"
+                            : "hover:bg-surface-2"
                         }`}
                       >
                         <div className="truncate text-sm font-semibold text-ink">
@@ -169,6 +171,7 @@ function MeetingDetail({ meetingId }: { meetingId: string }) {
     deleteMeeting,
     addGoal,
     setGoalStatus,
+    refresh,
   } = useStore();
   const { user } = useAuth();
 
@@ -195,10 +198,12 @@ function MeetingDetail({ meetingId }: { meetingId: string }) {
   const items = data.agendaItems.filter((a) => a.meetingId === m.id);
   const actions = data.actionItems.filter((a) => a.meetingId === m.id);
   const partner = data.members.find(
-    (x) => x.id === (m.withId === user.id ? m.ownerId : m.withId)
+    (x) => x.id === (m.withId === user.id ? m.ownerId : m.withId),
   );
   const goals = partner
-    ? data.goals.filter((g) => g.memberId === partner.id && g.status === "active")
+    ? data.goals.filter(
+        (g) => g.memberId === partner.id && g.status === "active",
+      )
     : [];
 
   const field =
@@ -220,6 +225,7 @@ function MeetingDetail({ meetingId }: { meetingId: string }) {
     if (!sb) return;
     setPushing(id);
     await actionToTask(sb, id);
+    refresh();
     setPushing(null);
   };
 
@@ -354,9 +360,7 @@ function MeetingDetail({ meetingId }: { meetingId: string }) {
           Action items
         </p>
         {actions.length === 0 && (
-          <p className="mb-2 text-sm text-ink-soft">
-            Nothing assigned yet.
-          </p>
+          <p className="mb-2 text-sm text-ink-soft">Nothing assigned yet.</p>
         )}
         <ul className="mb-3 space-y-2">
           {actions.map((a) => {
@@ -506,7 +510,7 @@ function NewMeetingModal({
   const { data, addMeeting } = useStore();
   const { user } = useAuth();
   const [title, setTitle] = useState(
-    kind === "staff" ? "Weekly Staff Meeting" : ""
+    kind === "staff" ? "Weekly Staff Meeting" : "",
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [withId, setWithId] = useState("");
@@ -516,8 +520,7 @@ function NewMeetingModal({
 
   const others = data.members.filter((m) => m.id !== user?.id);
   const partner = data.members.find((m) => m.id === withId);
-  const canCreate =
-    kind === "staff" ? title.trim() !== "" : withId !== "";
+  const canCreate = kind === "staff" ? title.trim() !== "" : withId !== "";
 
   const create = () => {
     if (!user || !canCreate) return;
@@ -525,7 +528,9 @@ function NewMeetingModal({
       kind,
       title:
         title.trim() ||
-        (partner ? `${user.name.split(" ")[0]} ↔ ${partner.name.split(" ")[0]}` : "1-on-1"),
+        (partner
+          ? `${user.name.split(" ")[0]} ↔ ${partner.name.split(" ")[0]}`
+          : "1-on-1"),
       date,
       ownerId: user.id,
       withId: kind === "one_on_one" ? withId : undefined,

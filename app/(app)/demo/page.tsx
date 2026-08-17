@@ -64,7 +64,7 @@ export default function DemoPage() {
   const run = async (
     key: string,
     fn: () => Promise<{ error?: string }>,
-    after?: string
+    after?: string,
   ) => {
     setBusy(key);
     const res = await fn();
@@ -77,9 +77,8 @@ export default function DemoPage() {
   };
 
   const sb = getSupabase();
-  const demoOrgs = (overview?.orgs ?? []).filter((o) =>
-    o.name.toLowerCase().includes("demo")
-  );
+  // Filter on the flag, not the name — a demo church can be called anything.
+  const demoOrgs = (overview?.orgs ?? []).filter((o) => o.is_demo);
   const myOrgId = user.orgId;
 
   return (
@@ -179,7 +178,7 @@ export default function DemoPage() {
                     run(
                       "role" + r,
                       () => demoSetMyRole(sb, r),
-                      `You are now ${ROLE_LABEL[r]} in this demo church.`
+                      `You are now ${ROLE_LABEL[r]} in this demo church.`,
                     )
                   }
                   disabled={busy === "role" + r}
@@ -221,7 +220,7 @@ export default function DemoPage() {
                 run(
                   "create",
                   () => createDemoChurch(sb, name.trim() || "Demo Church"),
-                  "Demo church created."
+                  "Demo church created.",
                 )
               }
               disabled={busy === "create"}
@@ -281,7 +280,7 @@ export default function DemoPage() {
                           run(
                             "switch" + o.id,
                             () => demoSwitchChurch(sb, o.id),
-                            `You're now inside ${o.name}.`
+                            `You're now inside ${o.name}.`,
                           )
                         }
                         disabled={busy === "switch" + o.id}
@@ -300,10 +299,14 @@ export default function DemoPage() {
                         if (!sb) return;
                         if (
                           confirm(
-                            `Delete "${o.name}" and all its demo data? This can't be undone.`
+                            `Delete "${o.name}" and all its demo data? This can't be undone.`,
                           )
                         )
-                          run("del" + o.id, () => deleteDemoChurch(sb, o.id), "Demo church deleted.");
+                          run(
+                            "del" + o.id,
+                            () => deleteDemoChurch(sb, o.id),
+                            "Demo church deleted.",
+                          );
                       }}
                       disabled={busy === "del" + o.id}
                       className="rounded-lg border border-line p-2 text-ink-soft hover:bg-red-50 hover:text-danger disabled:opacity-50"
@@ -323,7 +326,8 @@ export default function DemoPage() {
           <p>
             Demo churches are fully isolated from real ones, and only the
             platform team can create, enter, or delete them. Switching churches
-            moves your account — use <b>Enter</b> on your real church to go back.
+            moves your account — use <b>Enter</b> on your real church to go
+            back.
           </p>
         </div>
       </div>

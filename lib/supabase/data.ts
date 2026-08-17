@@ -819,6 +819,7 @@ export interface PlatformOrg {
   status: string;
   trial_ends_at: string | null;
   created_at: string;
+  is_demo: boolean;
   members: number;
   pending: number;
   messages: number;
