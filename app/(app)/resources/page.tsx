@@ -34,8 +34,11 @@ export default function ResourcesPage() {
   const seeAll = !!user && user.role !== "volunteer";
   const [adding, setAdding] = useState(false);
 
+  const isStaff = can("view_staff");
   const visible = data.resources.filter(
-    (r) => !r.department || seeAll || r.department === user?.department
+    (r) =>
+      (!r.staffOnly || isStaff) &&
+      (!r.department || seeAll || r.department === user?.department)
   );
 
   // Group: "For everyone" first, then by department.
@@ -157,6 +160,7 @@ function AddResourceModal({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState("");
   const [kind, setKind] = useState<ResourceKind>("link");
   const [department, setDepartment] = useState("");
+  const [staffOnly, setStaffOnly] = useState(false);
 
   const field =
     "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand";
@@ -169,6 +173,7 @@ function AddResourceModal({ onClose }: { onClose: () => void }) {
       url: url.trim() || undefined,
       kind,
       department: department || undefined,
+      staffOnly,
       createdById: user?.id,
     });
     onClose();
@@ -257,6 +262,19 @@ function AddResourceModal({ onClose }: { onClose: () => void }) {
               </select>
             </div>
           </div>
+
+          <label className="flex items-center gap-2.5 rounded-lg border border-line px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={staffOnly}
+              onChange={(e) => setStaffOnly(e.target.checked)}
+              className="h-4 w-4 accent-[var(--brand)]"
+            />
+            <span className="text-sm text-ink">Staff only</span>
+            <span className="ml-auto text-xs text-ink-soft">
+              Hidden from volunteers
+            </span>
+          </label>
         </div>
 
         <div className="mt-5 flex gap-2">

@@ -101,6 +101,7 @@ interface StoreValue {
     >
   ) => void;
   approveMember: (memberId: string, approved: boolean) => void;
+  setStaffFlag: (memberId: string, isStaff: boolean) => void;
   // resources
   addResource: (r: Omit<Resource, "id" | "createdAt">) => void;
   deleteResource: (id: string) => void;
@@ -325,6 +326,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           members: d.members.map((m) =>
             m.id === memberId ? { ...m, approved } : m
+          ),
+        }));
+      },
+      setStaffFlag: (memberId, isStaff) => {
+        const sb = live();
+        if (sb) fire(writes.setStaffFlag(sb, memberId, isStaff));
+        setData((d) => ({
+          ...d,
+          members: d.members.map((m) =>
+            m.id === memberId ? { ...m, isStaff } : m
           ),
         }));
       },

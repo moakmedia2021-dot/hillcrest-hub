@@ -17,8 +17,10 @@ import { getSupabase } from "@/lib/supabase/client";
 import {
   regenerateInviteCode,
   activateSubscriptionTest,
+  removeMember,
+  restoreMember,
 } from "@/lib/supabase/data";
-import { PLANS } from "@/lib/types";
+import { PLANS, type Member } from "@/lib/types";
 import { allDepartments } from "@/lib/departments";
 import {
   Check,
@@ -28,6 +30,7 @@ import {
   RefreshCw,
   Loader2,
   X,
+  UserMinus,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -39,6 +42,7 @@ const PERM_LABEL: Record<Permission, string> = {
   manage_schedule: "Manage production schedule",
   manage_events: "Plan & manage events",
   manage_channels: "Create teams / departments",
+  view_staff: "Access the Staff Hub",
   view_admin: "Access admin area",
 };
 
@@ -46,8 +50,14 @@ const ALL_PERMS = Object.keys(PERM_LABEL) as Permission[];
 
 export default function AdminPage() {
   const { user, can } = useAuth();
-  const { data, setMemberRole, setMemberDepartment, approveMember, reset } =
-    useStore();
+  const {
+    data,
+    setMemberRole,
+    setMemberDepartment,
+    approveMember,
+    setStaffFlag,
+    reset,
+  } = useStore();
   const pending = data.members.filter((m) => m.approved === false);
   const router = useRouter();
 
@@ -143,7 +153,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 {canManage ? (
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <DepartmentSelect
                       value={m.department}
                       onChange={(dept) => setMemberDepartment(m.id, dept)}
@@ -162,6 +172,22 @@ export default function AdminPage() {
                         </option>
                       ))}
                     </select>
+                    <button
+                      onClick={() => setStaffFlag(m.id, !m.isStaff)}
+                      title={
+                        m.isStaff
+                          ? "Remove staff access"
+                          : "Give staff access (Staff Hub, meetings)"
+                      }
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                        m.isStaff || m.role === "admin" || m.role === "pastor"
+                          ? "border-brand bg-brand-soft text-brand-dark"
+                          : "border-line text-ink-soft hover:bg-surface-2"
+                      }`}
+                    >
+                      Staff
+                    </button>
+                    <MemberActions member={m} />
                   </div>
                 ) : (
                   <span className="text-sm font-semibold text-ink-soft">
@@ -295,6 +321,55 @@ function InviteCard() {
         </button>
       </div>
     </section>
+  );
+}
+
+// Remove someone from the church, or bring them back. Removing keeps their
+// history — it just revokes access and frees their upcoming slots.
+function MemberActions({ member }: { member: Member }) {
+  const { user } = useAuth();
+  const { refresh } = useStore();
+  const [busy, setBusy] = useState(false);
+
+  if (member.id === user?.id) return null;
+
+  const act = async (remove: boolean) => {
+    const sb = getSupabase();
+    if (!sb) return;
+    if (
+      remove &&
+      !confirm(
+        `Remove ${member.name} from the church? They lose access immediately. Their chat history and past serving stay, and you can restore them later.`
+      )
+    )
+      return;
+    setBusy(true);
+    await (remove ? removeMember(sb, member.id) : restoreMember(sb, member.id));
+    setBusy(false);
+    refresh();
+  };
+
+  if (member.removed)
+    return (
+      <button
+        onClick={() => act(false)}
+        disabled={busy}
+        className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand-soft disabled:opacity-50"
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+        Restore
+      </button>
+    );
+
+  return (
+    <button
+      onClick={() => act(true)}
+      disabled={busy}
+      className="rounded-lg border border-line p-2 text-ink-soft hover:border-danger/40 hover:bg-red-50 hover:text-danger disabled:opacity-50"
+      title={`Remove ${member.name} from the church`}
+    >
+      {busy ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
+    </button>
   );
 }
 

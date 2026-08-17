@@ -114,6 +114,8 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     bio: p.bio ?? undefined,
     approved: p.approved ?? true, // pre-migration rows have no column → allow
     orgId: p.org_id ?? undefined,
+    isStaff: p.is_staff ?? false,
+    removed: p.removed ?? false,
   }));
 
   const resourceList: Resource[] = (resources.data ?? []).map((r) => ({
@@ -123,6 +125,7 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     url: r.url ?? undefined,
     kind: (r.kind as ResourceKind) ?? "link",
     department: r.department ?? undefined,
+    staffOnly: r.staff_only ?? false,
     createdById: r.created_by ?? undefined,
     createdAt: r.created_at,
   }));
@@ -375,6 +378,7 @@ export const writes = {
       url?: string;
       kind: string;
       department?: string;
+      staffOnly?: boolean;
       createdById?: string;
     }
   ) =>
@@ -384,8 +388,12 @@ export const writes = {
       url: r.url ?? null,
       kind: r.kind,
       department: r.department ?? null,
+      staff_only: r.staffOnly ?? false,
       created_by: r.createdById ?? null,
     }),
+
+  setStaffFlag: (sb: SupabaseClient, id: string, isStaff: boolean) =>
+    sb.from("profiles").update({ is_staff: isStaff }).eq("id", id),
 
   deleteResource: (sb: SupabaseClient, id: string) =>
     sb.from("resources").delete().eq("id", id),
@@ -662,6 +670,60 @@ export async function skipSetup(
   sb: SupabaseClient
 ): Promise<{ error?: string }> {
   const { error } = await sb.rpc("skip_setup");
+  return { error: error?.message };
+}
+
+// ── Taking someone off the team ──────────────────────────
+export async function removeMember(
+  sb: SupabaseClient,
+  memberId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("remove_member", { target: memberId });
+  return { error: error?.message };
+}
+
+export async function restoreMember(
+  sb: SupabaseClient,
+  memberId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("restore_member", { target: memberId });
+  return { error: error?.message };
+}
+
+// ── Demo mode (platform team only) ───────────────────────
+export async function createDemoChurch(
+  sb: SupabaseClient,
+  name: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("create_demo_church", { demo_name: name });
+  return { error: error?.message };
+}
+
+export async function demoSwitchChurch(
+  sb: SupabaseClient,
+  orgId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("demo_switch_church", { target_org: orgId });
+  return { error: error?.message };
+}
+
+export async function deleteDemoChurch(
+  sb: SupabaseClient,
+  orgId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("delete_demo_church", { target_org: orgId });
+  return { error: error?.message };
+}
+
+export async function demoSetMyRole(
+  sb: SupabaseClient,
+  role: string,
+  staff?: boolean
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("demo_set_my_role", {
+    new_role: role,
+    staff: staff ?? null,
+  });
   return { error: error?.message };
 }
 

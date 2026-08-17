@@ -16,6 +16,8 @@ import {
   CalendarCheck,
   ClipboardList,
   NotebookPen,
+  Briefcase,
+  FlaskConical,
   Award,
   BookOpen,
   Mail,
@@ -29,6 +31,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { ROLE_LABEL } from "@/lib/types";
 import { Logo } from "./Logo";
 import { Avatar, RoleBadge } from "./Avatar";
 import { NotificationBell } from "./NotificationBell";
@@ -57,7 +60,7 @@ const DEFAULT_COLLAPSED: Record<string, boolean> = {
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, signOut, can } = useAuth();
+  const { user, signOut, can, previewRole, setPreview } = useAuth();
   const { data } = useStore();
   const churchName = data.org?.name ?? "Hillcrest Hub";
   const pathname = usePathname();
@@ -77,54 +80,70 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const groups: { label: string; items: Item[] }[] = [
-    {
-      label: "Communication",
+  // The menu is built per role, so a volunteer never wades through tools
+  // meant for staff.
+  const isLead = can("manage_schedule");
+  const isStaff = can("view_staff");
+
+  const groups: { label: string; items: Item[] }[] = [];
+
+  // Everyone: what am I doing, and where do I talk?
+  groups.push({
+    label: "My Serving",
+    items: [
+      { href: "/my-sunday", label: "My Sunday", icon: CalendarCheck },
+      { href: "/serving", label: "My Availability", icon: CalendarDays },
+      { href: "/calendar", label: "Calendar", icon: CalendarRange },
+    ],
+  });
+
+  groups.push({
+    label: "Community",
+    items: [
+      { href: "/chat", label: "Chat & Announcements", icon: MessagesSquare },
+      { href: "/kudos", label: "Kudos", icon: Award },
+      { href: "/team", label: "Team Directory", icon: Users },
+      { href: "/resources", label: "Resources", icon: BookOpen },
+    ],
+  });
+
+  // Team Leads run their department.
+  if (isLead) {
+    groups.push({
+      label: "Lead My Team",
       items: [
-        { href: "/chat", label: "Chat & Announcements", icon: MessagesSquare },
-        { href: "/meetings", label: "Meetings", icon: NotebookPen },
-        { href: "/kudos", label: "Kudos", icon: Award },
-      ],
-    },
-    {
-      label: "Plan & Schedule",
-      items: [
+        { href: "/roster", label: "Roster Builder", icon: ClipboardList },
         { href: "/schedule", label: "Production Schedule", icon: KanbanSquare },
         { href: "/events", label: "Events", icon: CalendarRange },
-        { href: "/calendar", label: "Calendar", icon: CalendarDays },
-        { href: "/my-sunday", label: "My Sunday", icon: CalendarCheck },
-        { href: "/serving", label: "My Availability", icon: CalendarDays },
       ],
-    },
-    {
-      label: "Team",
-      items: [
-        { href: "/team", label: "Team Directory", icon: Users },
-        { href: "/resources", label: "Resources", icon: BookOpen },
-      ],
-    },
-    {
-      label: "Integrations",
-      items: [
-        { href: "/planning-center", label: "Planning Center", icon: FolderSync },
-      ],
-    },
-  ];
-
-  // Leads build the roster; everyone else just sees their own schedule.
-  if (can("manage_schedule"))
-    groups[1].items.push({
-      href: "/roster",
-      label: "Roster Builder",
-      icon: ClipboardList,
     });
+  }
 
-  const leadership: Item[] = [];
-  if (can("manage_schedule"))
-    leadership.push({ href: "/analytics", label: "Analytics", icon: BarChart3 });
+  // Staff get their own workspace.
+  if (isStaff) {
+    const staffItems: Item[] = [
+      { href: "/staff", label: "Staff Hub", icon: Briefcase },
+      { href: "/meetings", label: "Meetings & 1-on-1s", icon: NotebookPen },
+    ];
+    if (isLead)
+      staffItems.push({
+        href: "/analytics",
+        label: "Analytics",
+        icon: BarChart3,
+      });
+    staffItems.push({
+      href: "/planning-center",
+      label: "Planning Center",
+      icon: FolderSync,
+    });
+    groups.push({ label: "Staff", items: staffItems });
+  }
+
   if (can("view_admin"))
-    leadership.push({ href: "/admin", label: "Admin", icon: Shield });
-  if (leadership.length) groups.push({ label: "Leadership", items: leadership });
+    groups.push({
+      label: "Church Admin",
+      items: [{ href: "/admin", label: "Admin", icon: Shield }],
+    });
 
   // Internal platform team only — never shown to churches.
   if (user.platformAdmin)
@@ -132,6 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       label: "Platform",
       items: [
         { href: "/app-admin", label: "App Admin", icon: Building2 },
+        { href: "/demo", label: "Demo Mode", icon: FlaskConical },
       ],
     });
 
@@ -324,6 +344,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NotificationBell />
           </div>
         </header>
+
+        {previewRole && (
+          <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900">
+            <FlaskConical size={15} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              Previewing as <b>{ROLE_LABEL[previewRole]}</b> — menus and pages
+              reflect this role.
+            </span>
+            <button
+              onClick={() => setPreview(null)}
+              className="shrink-0 rounded-lg bg-amber-200 px-2.5 py-1 text-xs font-bold hover:bg-amber-300"
+            >
+              Exit preview
+            </button>
+          </div>
+        )}
 
         <main className="min-w-0 flex-1">{children}</main>
       </div>

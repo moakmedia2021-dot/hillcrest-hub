@@ -20,6 +20,7 @@ import { SUPABASE_ENABLED } from "./supabase/config";
 import { getSupabase } from "./supabase/client";
 
 const SESSION_KEY = "hillcrest-hub:session:v1";
+const PREVIEW_KEY = "hillcrest-hub:preview-role:v1";
 
 interface AuthValue {
   user: Member | null;
@@ -41,6 +42,13 @@ interface AuthValue {
   ) => Promise<{ error?: string }>;
   // re-read the profile (after creating or joining a church)
   refreshUser: () => Promise<void>;
+  // Demo mode: the platform team can preview the app as another role.
+  // This changes what the UI shows; the database still enforces their real
+  // permissions, so writes behave as their actual role.
+  previewRole: Role | null;
+  previewStaff: boolean;
+  setPreview: (role: Role | null, staff?: boolean) => void;
+  realRole: Role | null;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -52,6 +60,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [demoId, setDemoId] = useState<string | null>(null);
   // supabase: the fetched profile mapped to a Member
   const [profile, setProfile] = useState<Member | null>(null);
+  // demo mode role preview
+  const [previewRole, setPreviewRole] = useState<Role | null>(null);
+  const [previewStaff, setPreviewStaff] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(PREVIEW_KEY);
+      if (raw) {
+        const p = JSON.parse(raw) as { role: Role | null; staff: boolean };
+        setPreviewRole(p.role);
+        setPreviewStaff(Boolean(p.staff));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const loadProfile = async (userId: string) => {
     const sb = getSupabase();
@@ -93,15 +117,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const user: Member | null = SUPABASE_ENABLED
+  const realUser: Member | null = SUPABASE_ENABLED
     ? profile
     : data.members.find((m) => m.id === demoId) ?? null;
+
+  // Only the platform team can preview another role, and only for the UI —
+  // the database still applies their real permissions.
+  const previewing = Boolean(realUser?.platformAdmin && previewRole);
+  const user: Member | null = previewing
+    ? { ...realUser!, role: previewRole!, isStaff: previewStaff }
+    : realUser;
 
   const value: AuthValue = {
     user,
     ready,
     enabled: SUPABASE_ENABLED,
-    can: (perm) => (user ? roleCan(user.role, perm) : false),
+    can: (perm) =>
+      user ? roleCan(user.role, perm, user.isStaff) : false,
+    previewRole: previewing ? previewRole : null,
+    previewStaff,
+    realRole: realUser?.role ?? null,
+    setPreview: (role, staff) => {
+      const s = staff ?? (role === "admin" || role === "pastor");
+      setPreviewRole(role);
+      setPreviewStaff(s);
+      try {
+        if (role)
+          window.localStorage.setItem(
+            PREVIEW_KEY,
+            JSON.stringify({ role, staff: s })
+          );
+        else window.localStorage.removeItem(PREVIEW_KEY);
+      } catch {
+        /* ignore */
+      }
+    },
     signOut: () => {
       if (SUPABASE_ENABLED) {
         getSupabase()?.auth.signOut();
@@ -153,6 +203,8 @@ function mapProfile(p: Record<string, unknown>): Member {
     approved: (p.approved as boolean) ?? true,
     orgId: (p.org_id as string) ?? undefined,
     platformAdmin: (p.platform_admin as boolean) ?? false,
+    isStaff: (p.is_staff as boolean) ?? false,
+    removed: (p.removed as boolean) ?? false,
   };
 }
 

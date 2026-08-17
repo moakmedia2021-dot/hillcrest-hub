@@ -97,6 +97,7 @@ export type Permission =
   | "manage_schedule" // create/assign/delete production tasks
   | "manage_events" // create/plan events
   | "manage_channels" // create teams/departments
+  | "view_staff" // see the Staff section
   | "view_admin"; // see the admin area
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -106,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "manage_schedule",
     "manage_events",
     "manage_channels",
+    "view_staff",
     "view_admin",
   ],
   pastor: [
@@ -113,13 +115,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "manage_schedule",
     "manage_events",
     "manage_channels",
+    "view_staff",
   ],
   lead: ["manage_schedule", "manage_events"],
   volunteer: [],
 };
 
-export function can(role: Role, perm: Permission): boolean {
+// `isStaff` is a flag alongside role, so a Team Lead who's also paid staff
+// gets the Staff section without being made an admin.
+export function can(
+  role: Role,
+  perm: Permission,
+  isStaff = false
+): boolean {
+  if (perm === "view_staff" && isStaff) return true;
   return ROLE_PERMISSIONS[role].includes(perm);
+}
+
+export function isStaffRole(role: Role, isStaff?: boolean): boolean {
+  return Boolean(isStaff) || role === "admin" || role === "pastor";
 }
 
 export interface Member {
@@ -137,6 +151,8 @@ export interface Member {
   approved?: boolean; // false = pending admin approval
   orgId?: string; // which church they belong to
   platformAdmin?: boolean; // runs the platform itself — granted via SQL only
+  isStaff?: boolean; // paid church staff — unlocks the Staff section
+  removed?: boolean; // taken off the team, history preserved
 }
 
 export type ResourceKind = "link" | "file" | "video" | "doc" | "note";
@@ -148,6 +164,7 @@ export interface Resource {
   url?: string;
   kind: ResourceKind;
   department?: string; // undefined = everyone
+  staffOnly?: boolean; // hidden from volunteers
   createdById?: string;
   createdAt: string;
 }
