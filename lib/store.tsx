@@ -186,11 +186,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Reload whenever auth resolves or changes (initial session, sign in,
       // sign out) so reads run with the session attached — not as anon.
       const { data: authSub } = sb.auth.onAuthStateChange(() => refresh());
+      // Safety net: if the realtime socket drops (sleep, tunnel, flaky wifi)
+      // we'd otherwise show stale data until a manual reload.
+      const onWake = () => {
+        if (document.visibilityState === "visible") refresh();
+      };
+      window.addEventListener("focus", onWake);
+      document.addEventListener("visibilitychange", onWake);
       refresh();
       setHydrated(true);
       return () => {
         realtimeUnsub();
         authSub.subscription.unsubscribe();
+        window.removeEventListener("focus", onWake);
+        document.removeEventListener("visibilitychange", onWake);
       };
     }
     setData(load());

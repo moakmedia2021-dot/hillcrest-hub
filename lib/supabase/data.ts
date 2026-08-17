@@ -287,6 +287,12 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
 export function subscribe(sb: SupabaseClient, onChange: () => void) {
   const channel = sb
     .channel("hub-changes")
+    // People: roles, staff access, approvals, removals, names, avatars.
+    .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "organizations" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "departments" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "goals" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "events" }, onChange)

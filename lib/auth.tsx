@@ -11,6 +11,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -77,9 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Which profile row is "me" — used by the realtime listener below.
+  const profileIdRef = useRef<string | null>(null);
+
   const loadProfile = async (userId: string) => {
     const sb = getSupabase();
     if (!sb) return;
+    profileIdRef.current = userId;
     const { data: p } = await sb
       .from("profiles")
       .select("*")
@@ -114,7 +119,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) loadProfile(session.user.id);
       else setProfile(null);
     });
-    return () => sub.subscription.unsubscribe();
+
+    // Your own row changing (role, staff access, approval, being removed)
+    // should re-render your menus immediately, not on next reload.
+    const selfChannel = sb
+      .channel("my-profile")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles" },
+        (payload) => {
+          const row = payload.new as { id?: string };
+          if (row?.id && row.id === profileIdRef.current) loadProfile(row.id);
+        }
+      )
+      .subscribe();
+
+    // And re-check when you come back to the tab.
+    const onWake = () => {
+      if (document.visibilityState === "visible" && profileIdRef.current)
+        loadProfile(profileIdRef.current);
+    };
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
+
+    return () => {
+      sub.subscription.unsubscribe();
+      sb.removeChannel(selfChannel);
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
+    };
   }, []);
 
   const realUser: Member | null = SUPABASE_ENABLED
