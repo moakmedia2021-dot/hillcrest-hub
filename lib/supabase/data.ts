@@ -23,6 +23,8 @@ import type {
   Assignment,
   SubRequest,
   SubStatusKind,
+  Meeting,
+  Goal,
   Role,
   TaskStage,
   ResourceKind,
@@ -47,6 +49,11 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     orgs,
     assignments,
     subReqs,
+    depts,
+    meetings,
+    agenda,
+    actions,
+    goals,
   ] = await Promise.all([
     sb.from("profiles").select("*").order("name"),
     sb.from("channels").select("*").order("created_at"),
@@ -65,6 +72,11 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
     sb.from("organizations").select("*").limit(1),
     sb.from("assignments").select("*").order("date"),
     sb.from("sub_requests").select("*").order("created_at", { ascending: false }),
+    sb.from("departments").select("*").order("name"),
+    sb.from("meetings").select("*").order("date", { ascending: false }),
+    sb.from("agenda_items").select("*").order("sort"),
+    sb.from("action_items").select("*").order("created_at"),
+    sb.from("goals").select("*").order("created_at", { ascending: false }),
   ]);
 
   const orgRow = orgs.data?.[0];
@@ -78,6 +90,8 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
         plan: (orgRow.plan as Organization["plan"]) ?? undefined,
         status: (orgRow.status as Organization["status"]) ?? undefined,
         trialEndsAt: (orgRow.trial_ends_at as string) ?? undefined,
+        // Older databases have no column yet — treat as already set up.
+        setupComplete: (orgRow.setup_complete as boolean) ?? true,
       }
     : undefined;
 
@@ -177,6 +191,10 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
 
   return {
     org,
+    departments: (depts.data ?? []).map((d) => ({
+      id: d.id as string,
+      name: d.name as string,
+    })),
     members,
     channels: channelList,
     messages: messageList,
@@ -216,6 +234,38 @@ export async function loadAll(sb: SupabaseClient): Promise<AppData> {
         published: a.published ?? false,
       })
     ),
+    meetings: (meetings.data ?? []).map((m) => ({
+      id: m.id as string,
+      kind: m.kind as Meeting["kind"],
+      title: m.title as string,
+      date: m.date as string,
+      department: (m.department as string) ?? undefined,
+      ownerId: (m.owner_id as string) ?? undefined,
+      withId: (m.with_id as string) ?? undefined,
+      notes: (m.notes as string) ?? undefined,
+      createdAt: m.created_at as string,
+    })),
+    agendaItems: (agenda.data ?? []).map((a) => ({
+      id: a.id as string,
+      meetingId: a.meeting_id as string,
+      text: a.text as string,
+      addedById: (a.added_by as string) ?? undefined,
+      discussed: (a.discussed as boolean) ?? false,
+    })),
+    actionItems: (actions.data ?? []).map((a) => ({
+      id: a.id as string,
+      meetingId: a.meeting_id as string,
+      text: a.text as string,
+      assigneeId: (a.assignee_id as string) ?? undefined,
+      dueDate: (a.due_date as string) ?? undefined,
+      done: (a.done as boolean) ?? false,
+    })),
+    goals: (goals.data ?? []).map((g) => ({
+      id: g.id as string,
+      memberId: g.member_id as string,
+      text: g.text as string,
+      status: g.status as Goal["status"],
+    })),
     subRequests: (subReqs.data ?? []).map(
       (s): SubRequest => ({
         id: s.id,
@@ -246,6 +296,9 @@ export function subscribe(sb: SupabaseClient, onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "kudos" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "assignments" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "sub_requests" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "meetings" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "agenda_items" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "action_items" }, onChange)
     .subscribe();
   return () => {
     sb.removeChannel(channel);
@@ -478,7 +531,139 @@ export const writes = {
       .update({ published: true })
       .eq("date", date)
       .eq("department", department),
+
+  addDepartment: (sb: SupabaseClient, name: string) =>
+    sb.from("departments").insert({ name }),
+
+  deleteDepartment: (sb: SupabaseClient, id: string) =>
+    sb.from("departments").delete().eq("id", id),
+
+  // ── Meetings ──
+  addMeeting: (
+    sb: SupabaseClient,
+    m: {
+      kind: string;
+      title: string;
+      date: string;
+      ownerId: string;
+      withId?: string;
+      department?: string;
+    }
+  ) =>
+    sb.from("meetings").insert({
+      kind: m.kind,
+      title: m.title,
+      date: m.date,
+      owner_id: m.ownerId,
+      with_id: m.withId ?? null,
+      department: m.department ?? null,
+    }),
+
+  setMeetingNotes: (sb: SupabaseClient, id: string, notes: string) =>
+    sb.from("meetings").update({ notes }).eq("id", id),
+
+  deleteMeeting: (sb: SupabaseClient, id: string) =>
+    sb.from("meetings").delete().eq("id", id),
+
+  addAgendaItem: (
+    sb: SupabaseClient,
+    meetingId: string,
+    text: string,
+    addedBy: string
+  ) =>
+    sb
+      .from("agenda_items")
+      .insert({ meeting_id: meetingId, text, added_by: addedBy }),
+
+  setAgendaDiscussed: (sb: SupabaseClient, id: string, discussed: boolean) =>
+    sb.from("agenda_items").update({ discussed }).eq("id", id),
+
+  deleteAgendaItem: (sb: SupabaseClient, id: string) =>
+    sb.from("agenda_items").delete().eq("id", id),
+
+  addActionItem: (
+    sb: SupabaseClient,
+    a: {
+      meetingId: string;
+      text: string;
+      assigneeId?: string;
+      dueDate?: string;
+    }
+  ) =>
+    sb.from("action_items").insert({
+      meeting_id: a.meetingId,
+      text: a.text,
+      assignee_id: a.assigneeId ?? null,
+      due_date: a.dueDate ?? null,
+    }),
+
+  setActionDone: (sb: SupabaseClient, id: string, done: boolean) =>
+    sb.from("action_items").update({ done }).eq("id", id),
+
+  deleteActionItem: (sb: SupabaseClient, id: string) =>
+    sb.from("action_items").delete().eq("id", id),
+
+  addGoal: (sb: SupabaseClient, memberId: string, text: string) =>
+    sb.from("goals").insert({ member_id: memberId, text }),
+
+  setGoalStatus: (sb: SupabaseClient, id: string, status: string) =>
+    sb.from("goals").update({ status }).eq("id", id),
 };
+
+// Turn a meeting action item into a real task on the production board.
+export async function actionToTask(
+  sb: SupabaseClient,
+  itemId: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("action_to_task", { item_id: itemId });
+  return { error: error?.message };
+}
+
+// Private notes are readable only by their author (enforced by RLS).
+export async function loadPrivateNote(
+  sb: SupabaseClient,
+  meetingId: string
+): Promise<string> {
+  const { data } = await sb
+    .from("private_notes")
+    .select("body")
+    .eq("meeting_id", meetingId)
+    .maybeSingle();
+  return (data?.body as string) ?? "";
+}
+
+export async function savePrivateNote(
+  sb: SupabaseClient,
+  meetingId: string,
+  authorId: string,
+  body: string
+): Promise<{ error?: string }> {
+  const { error } = await sb
+    .from("private_notes")
+    .upsert(
+      { meeting_id: meetingId, author_id: authorId, body, updated_at: new Date().toISOString() },
+      { onConflict: "meeting_id,author_id" }
+    );
+  return { error: error?.message };
+}
+
+// ── First-run setup ──────────────────────────────────────
+export async function completeSetup(
+  sb: SupabaseClient,
+  departments: string[]
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("complete_setup", {
+    dept_names: departments,
+  });
+  return { error: error?.message };
+}
+
+export async function skipSetup(
+  sb: SupabaseClient
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("skip_setup");
+  return { error: error?.message };
+}
 
 // ── Sub / swap ───────────────────────────────────────────
 export async function requestSub(
@@ -486,9 +671,32 @@ export async function requestSub(
   assignmentId: string,
   reason?: string
 ): Promise<{ error?: string }> {
-  const { error } = await sb.rpc("request_sub", {
+  const { data, error } = await sb.rpc("request_sub", {
     assignment: assignmentId,
     why: reason ?? null,
+  });
+  if (error) return { error: error.message };
+  // Tell the department — best effort, never blocks the request itself.
+  const id = (data as { id?: string } | null)?.id;
+  if (id) {
+    try {
+      await sb.rpc("notify_sub_request", { req_id: id });
+    } catch {
+      /* notifying is best effort */
+    }
+  }
+  return {};
+}
+
+// Queue "you're serving" reminders for everyone on a published roster.
+export async function notifyRoster(
+  sb: SupabaseClient,
+  date: string,
+  department: string
+): Promise<{ error?: string }> {
+  const { error } = await sb.rpc("notify_roster", {
+    the_date: date,
+    dept: department,
   });
   return { error: error?.message };
 }

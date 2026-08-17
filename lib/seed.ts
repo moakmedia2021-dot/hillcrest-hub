@@ -7,6 +7,13 @@ const daysFromNow = (d: number) =>
   new Date(now + d * 86400_000).toISOString().slice(0, 10);
 
 export const SEED: AppData = {
+  departments: [
+    { id: "d1", name: "Leadership" },
+    { id: "d2", name: "Creative" },
+    { id: "d3", name: "Worship" },
+    { id: "d4", name: "Youth" },
+  ],
+
   members: [
     {
       id: "u_malachi",
@@ -392,6 +399,37 @@ export const SEED: AppData = {
   ],
 
   subRequests: [],
+
+  meetings: [
+    {
+      id: "mt1",
+      kind: "staff",
+      title: "Weekly Staff Meeting",
+      date: daysFromNow(1),
+      ownerId: "u_michael",
+      createdAt: hoursAgo(40),
+    },
+    {
+      id: "mt2",
+      kind: "one_on_one",
+      title: "Malachi ↔ James",
+      date: daysFromNow(2),
+      ownerId: "u_malachi",
+      withId: "u_james",
+      createdAt: hoursAgo(20),
+    },
+  ],
+  agendaItems: [
+    { id: "ag1", meetingId: "mt1", text: "Weekend recap — attendance was up", addedById: "u_michael", discussed: false },
+    { id: "ag2", meetingId: "mt1", text: "Summer on the Mount graphics timeline", addedById: "u_malachi", discussed: false },
+    { id: "ag3", meetingId: "mt2", text: "How's the new camera workflow feeling?", addedById: "u_malachi", discussed: false },
+  ],
+  actionItems: [
+    { id: "ac1", meetingId: "mt1", text: "Send volunteer thank-you notes", assigneeId: "u_sarah", dueDate: daysFromNow(5), done: false },
+  ],
+  goals: [
+    { id: "g1", memberId: "u_james", text: "Learn the livestream switcher by September", status: "active" },
+  ],
 
   kudos: [
     {

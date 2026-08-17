@@ -19,7 +19,7 @@ export function DepartmentSelect({
   const [adding, setAdding] = useState(false);
   const [fresh, setFresh] = useState("");
 
-  const options = allDepartments(data.members);
+  const options = allDepartments(data);
   const cls =
     className ??
     "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand";

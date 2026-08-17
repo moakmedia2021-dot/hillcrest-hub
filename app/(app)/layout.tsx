@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { ChurchOnboarding } from "@/components/ChurchOnboarding";
+import { SetupWizard } from "@/components/SetupWizard";
+import { useStore } from "@/lib/store";
 import { SUPABASE_ENABLED } from "@/lib/supabase/config";
 import { Clock, LogOut } from "lucide-react";
 
@@ -14,6 +16,7 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   const { user, ready, signOut } = useAuth();
+  const { data, refresh } = useStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -59,6 +62,17 @@ export default function AppLayout({
         </div>
       </div>
     );
+  }
+
+  // First run for a brand-new church: build ministries instead of landing
+  // the admin in an empty workspace.
+  if (
+    SUPABASE_ENABLED &&
+    user.role === "admin" &&
+    data.org &&
+    data.org.setupComplete === false
+  ) {
+    return <SetupWizard onDone={refresh} />;
   }
 
   return <AppShell>{children}</AppShell>;

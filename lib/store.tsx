@@ -28,10 +28,13 @@ import type {
   Resource,
   RsvpStatus,
   Assignment,
+  MeetingKind,
+  ActionItem,
+  Goal,
 } from "./types";
 import { SUPABASE_ENABLED } from "./supabase/config";
 import { getSupabase } from "./supabase/client";
-import { loadAll, subscribe, writes } from "./supabase/data";
+import { loadAll, subscribe, writes, notifyRoster } from "./supabase/data";
 
 const STORAGE_KEY = "hillcrest-hub:data:v1";
 
@@ -71,6 +74,7 @@ function fire(p: PromiseLike<unknown>) {
 
 interface StoreValue {
   data: AppData;
+  refresh: () => void; // re-pull everything (after setup, etc.)
   // messages
   sendMessage: (
     channelId: string,
@@ -100,6 +104,28 @@ interface StoreValue {
   // resources
   addResource: (r: Omit<Resource, "id" | "createdAt">) => void;
   deleteResource: (id: string) => void;
+  // departments
+  addDepartment: (name: string) => void;
+  deleteDepartment: (id: string) => void;
+  // meetings
+  addMeeting: (m: {
+    kind: MeetingKind;
+    title: string;
+    date: string;
+    ownerId: string;
+    withId?: string;
+    department?: string;
+  }) => void;
+  setMeetingNotes: (id: string, notes: string) => void;
+  deleteMeeting: (id: string) => void;
+  addAgendaItem: (meetingId: string, text: string, addedBy: string) => void;
+  setAgendaDiscussed: (id: string, discussed: boolean) => void;
+  deleteAgendaItem: (id: string) => void;
+  addActionItem: (a: Omit<ActionItem, "id" | "done">) => void;
+  setActionDone: (id: string, done: boolean) => void;
+  deleteActionItem: (id: string) => void;
+  addGoal: (memberId: string, text: string) => void;
+  setGoalStatus: (id: string, status: Goal["status"]) => void;
   // rosters
   addAssignment: (a: Omit<Assignment, "id">) => void;
   setAssignmentMember: (id: string, memberId: string | null) => void;
@@ -179,6 +205,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoreValue>(
     () => ({
       data,
+      refresh: () => {
+        const sb = live();
+        if (sb) loadAll(sb).then(setData).catch(() => {});
+      },
       sendMessage: (channelId, authorId, body, imageUrl) => {
         // Optimistic in both modes so the sender sees their message instantly.
         // In Supabase mode, realtime + the next loadAll reconcile this temp row
@@ -320,6 +350,145 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           resources: d.resources.filter((r) => r.id !== id),
         }));
       },
+      addDepartment: (name) => {
+        const clean = name.trim();
+        if (!clean) return;
+        const sb = live();
+        if (sb) {
+          fire(writes.addDepartment(sb, clean));
+        } else {
+          setData((d) =>
+            d.departments.some((x) => x.name === clean)
+              ? d
+              : { ...d, departments: [...d.departments, { id: uid(), name: clean }] }
+          );
+        }
+      },
+      deleteDepartment: (id) => {
+        const sb = live();
+        if (sb) fire(writes.deleteDepartment(sb, id));
+        setData((d) => ({
+          ...d,
+          departments: d.departments.filter((x) => x.id !== id),
+        }));
+      },
+      addMeeting: (m) => {
+        const sb = live();
+        if (sb) {
+          fire(writes.addMeeting(sb, m));
+        } else {
+          setData((d) => ({
+            ...d,
+            meetings: [
+              { ...m, id: uid(), createdAt: new Date().toISOString() },
+              ...d.meetings,
+            ],
+          }));
+        }
+      },
+      setMeetingNotes: (id, notes) => {
+        const sb = live();
+        if (sb) fire(writes.setMeetingNotes(sb, id, notes));
+        setData((d) => ({
+          ...d,
+          meetings: d.meetings.map((m) => (m.id === id ? { ...m, notes } : m)),
+        }));
+      },
+      deleteMeeting: (id) => {
+        const sb = live();
+        if (sb) fire(writes.deleteMeeting(sb, id));
+        setData((d) => ({
+          ...d,
+          meetings: d.meetings.filter((m) => m.id !== id),
+        }));
+      },
+      addAgendaItem: (meetingId, text, addedBy) => {
+        const clean = text.trim();
+        if (!clean) return;
+        const sb = live();
+        if (sb) {
+          fire(writes.addAgendaItem(sb, meetingId, clean, addedBy));
+        } else {
+          setData((d) => ({
+            ...d,
+            agendaItems: [
+              ...d.agendaItems,
+              { id: uid(), meetingId, text: clean, addedById: addedBy, discussed: false },
+            ],
+          }));
+        }
+      },
+      setAgendaDiscussed: (id, discussed) => {
+        const sb = live();
+        if (sb) fire(writes.setAgendaDiscussed(sb, id, discussed));
+        setData((d) => ({
+          ...d,
+          agendaItems: d.agendaItems.map((a) =>
+            a.id === id ? { ...a, discussed } : a
+          ),
+        }));
+      },
+      deleteAgendaItem: (id) => {
+        const sb = live();
+        if (sb) fire(writes.deleteAgendaItem(sb, id));
+        setData((d) => ({
+          ...d,
+          agendaItems: d.agendaItems.filter((a) => a.id !== id),
+        }));
+      },
+      addActionItem: (a) => {
+        const sb = live();
+        if (sb) {
+          fire(writes.addActionItem(sb, a));
+        } else {
+          setData((d) => ({
+            ...d,
+            actionItems: [...d.actionItems, { ...a, id: uid(), done: false }],
+          }));
+        }
+      },
+      setActionDone: (id, done) => {
+        const sb = live();
+        if (sb) fire(writes.setActionDone(sb, id, done));
+        setData((d) => ({
+          ...d,
+          actionItems: d.actionItems.map((a) =>
+            a.id === id ? { ...a, done } : a
+          ),
+        }));
+      },
+      deleteActionItem: (id) => {
+        const sb = live();
+        if (sb) fire(writes.deleteActionItem(sb, id));
+        setData((d) => ({
+          ...d,
+          actionItems: d.actionItems.filter((a) => a.id !== id),
+        }));
+      },
+      addGoal: (memberId, text) => {
+        const clean = text.trim();
+        if (!clean) return;
+        const sb = live();
+        if (sb) {
+          fire(writes.addGoal(sb, memberId, clean));
+        } else {
+          setData((d) => ({
+            ...d,
+            goals: [
+              { id: uid(), memberId, text: clean, status: "active" },
+              ...d.goals,
+            ],
+          }));
+        }
+      },
+      setGoalStatus: (id, status) => {
+        const sb = live();
+        if (sb) fire(writes.setGoalStatus(sb, id, status));
+        setData((d) => ({
+          ...d,
+          goals: d.goals.map((g) => (g.id === id ? { ...g, status } : g)),
+        }));
+      },
       addAssignment: (a) => {
         const sb = live();
         if (sb) {
@@ -351,7 +520,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       publishRoster: (date, department) => {
         const sb = live();
-        if (sb) fire(writes.publishRoster(sb, date, department));
+        if (sb) {
+          fire(writes.publishRoster(sb, date, department));
+          // Everyone on the roster gets a "you're serving" reminder.
+          fire(notifyRoster(sb, date, department));
+        }
         setData((d) => ({
           ...d,
           assignments: d.assignments.map((a) =>

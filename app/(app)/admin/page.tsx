@@ -19,7 +19,16 @@ import {
   activateSubscriptionTest,
 } from "@/lib/supabase/data";
 import { PLANS } from "@/lib/types";
-import { Check, Minus, RotateCcw, Copy, RefreshCw, Loader2 } from "lucide-react";
+import { allDepartments } from "@/lib/departments";
+import {
+  Check,
+  Minus,
+  RotateCcw,
+  Copy,
+  RefreshCw,
+  Loader2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
 const ROLES: Role[] = ["admin", "pastor", "lead", "volunteer"];
@@ -70,6 +79,7 @@ export default function AdminPage() {
       <div className="space-y-8 p-5 sm:p-8">
         {/* Invite code + billing */}
         {data.org && <InviteCard />}
+        {canManage && <DepartmentsCard />}
         {data.org && <BillingCard />}
 
         {/* Pending approvals */}
@@ -282,6 +292,75 @@ function InviteCard() {
         >
           <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
           New code
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// The ministries this church runs. Drives department chats, resources,
+// rosters and who can see what.
+function DepartmentsCard() {
+  const { data, addDepartment, deleteDepartment } = useStore();
+  const [name, setName] = useState("");
+  const list = allDepartments(data);
+
+  const add = () => {
+    if (!name.trim()) return;
+    addDepartment(name);
+    setName("");
+  };
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-line px-5 py-3.5">
+        <h2 className="font-bold text-ink">Ministries</h2>
+        <p className="text-xs text-ink-soft">
+          Each one gets its own chat, resources and rosters.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 p-5">
+        {list.length === 0 && (
+          <p className="text-sm text-ink-soft">No ministries yet.</p>
+        )}
+        {list.map((d) => {
+          const row = data.departments.find((x) => x.name === d);
+          const inUse = data.members.some((m) => m.department === d);
+          return (
+            <span
+              key={d}
+              className="flex items-center gap-1.5 rounded-full border border-line py-1.5 pl-3 pr-1.5 text-sm text-ink"
+            >
+              {d}
+              {row && !inUse && (
+                <button
+                  onClick={() => deleteDepartment(row.id)}
+                  className="rounded-full p-1 text-ink-soft hover:bg-red-50 hover:text-danger"
+                  title={`Remove ${d}`}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </span>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2 border-t border-line p-4">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Add a ministry — e.g. Prayer"
+          className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 text-base outline-none focus:border-brand sm:text-sm"
+        />
+        <button
+          onClick={add}
+          disabled={!name.trim()}
+          className="rounded-lg bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
+        >
+          Add
         </button>
       </div>
     </section>

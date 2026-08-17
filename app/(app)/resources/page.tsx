@@ -249,7 +249,7 @@ function AddResourceModal({ onClose }: { onClose: () => void }) {
                 className={field}
               >
                 <option value="">Everyone</option>
-                {allDepartments(data.members).map((d) => (
+                {allDepartments(data).map((d) => (
                   <option key={d} value={d}>
                     {d} only
                   </option>

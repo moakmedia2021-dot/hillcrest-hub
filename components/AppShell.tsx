@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CalendarCheck,
   ClipboardList,
+  NotebookPen,
   Award,
   BookOpen,
   Mail,
@@ -81,6 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       label: "Communication",
       items: [
         { href: "/chat", label: "Chat & Announcements", icon: MessagesSquare },
+        { href: "/meetings", label: "Meetings", icon: NotebookPen },
         { href: "/kudos", label: "Kudos", icon: Award },
       ],
     },

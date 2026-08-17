@@ -72,6 +72,13 @@ export interface Organization {
   plan?: PlanId;
   status?: SubStatus;
   trialEndsAt?: string;
+  setupComplete?: boolean;
+}
+
+// A ministry within a church. Each church has its own list.
+export interface Department {
+  id: string;
+  name: string;
 }
 
 export type Role = "admin" | "pastor" | "lead" | "volunteer";
@@ -315,8 +322,47 @@ export const POSITION_SUGGESTIONS: Record<string, string[]> = {
   Security: ["Lobby", "Parking", "Kids Wing"],
 };
 
+export type MeetingKind = "staff" | "one_on_one";
+
+export interface Meeting {
+  id: string;
+  kind: MeetingKind;
+  title: string;
+  date: string;
+  department?: string;
+  ownerId?: string;
+  withId?: string; // the other person, for 1-on-1s
+  notes?: string; // shared notes
+  createdAt: string;
+}
+
+export interface AgendaItem {
+  id: string;
+  meetingId: string;
+  text: string;
+  addedById?: string;
+  discussed: boolean;
+}
+
+export interface ActionItem {
+  id: string;
+  meetingId: string;
+  text: string;
+  assigneeId?: string;
+  dueDate?: string;
+  done: boolean;
+}
+
+export interface Goal {
+  id: string;
+  memberId: string;
+  text: string;
+  status: "active" | "done" | "dropped";
+}
+
 export interface AppData {
   org?: Organization; // the signed-in user's church
+  departments: Department[];
   members: Member[];
   channels: Channel[];
   messages: Message[];
@@ -329,4 +375,8 @@ export interface AppData {
   kudos: Kudos[];
   assignments: Assignment[];
   subRequests: SubRequest[];
+  meetings: Meeting[];
+  agendaItems: AgendaItem[];
+  actionItems: ActionItem[];
+  goals: Goal[];
 }

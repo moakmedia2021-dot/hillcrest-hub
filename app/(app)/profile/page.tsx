@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Avatar, RoleBadge } from "@/components/Avatar";
 import { getSupabase } from "@/lib/supabase/client";
 import { uploadAvatar } from "@/lib/supabase/data";
-import { Camera, Check, Loader2, Mail, Lock } from "lucide-react";
+import { enablePush, disablePush, pushAvailable } from "@/lib/push";
+import { Camera, Check, Loader2, Mail, Lock, Bell, BellOff } from "lucide-react";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -198,7 +199,88 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+
+        <NotificationSettings />
       </div>
     </>
+  );
+}
+
+// Turn on device notifications so reminders reach people outside the app.
+function NotificationSettings() {
+  const { user } = useAuth();
+  const [on, setOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker
+      .getRegistration()
+      .then((reg) => reg?.pushManager.getSubscription())
+      .then((sub) => setOn(Boolean(sub)))
+      .catch(() => {});
+  }, []);
+
+  if (!user) return null;
+
+  const available = pushAvailable();
+
+  const toggle = async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+    setBusy(true);
+    setMsg(null);
+    if (on) {
+      await disablePush(sb);
+      setOn(false);
+      setMsg("Notifications turned off for this device.");
+    } else {
+      const res = await enablePush(sb, user.id);
+      if (res.error) setMsg(res.error);
+      else {
+        setOn(true);
+        setMsg("You'll get reminders on this device.");
+      }
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="card p-6">
+      <h2 className="mb-1 font-bold text-ink">Notifications</h2>
+      <p className="mb-4 text-sm text-ink-soft">
+        Get reminded when you&apos;re serving, when a teammate needs cover, and
+        when something is due.
+      </p>
+
+      {!available ? (
+        <p className="rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-soft">
+          Push notifications aren&apos;t set up on this deployment yet.
+          You&apos;ll still see everything in the bell.
+        </p>
+      ) : (
+        <button
+          onClick={toggle}
+          disabled={busy}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${
+            on
+              ? "border border-line text-ink-soft hover:bg-surface-2"
+              : "bg-brand text-white hover:bg-brand-dark"
+          }`}
+        >
+          {busy ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : on ? (
+            <BellOff size={15} />
+          ) : (
+            <Bell size={15} />
+          )}
+          {on ? "Turn off notifications" : "Turn on notifications"}
+        </button>
+      )}
+
+      {msg && <p className="mt-3 text-sm text-ink-soft">{msg}</p>}
+    </div>
   );
 }

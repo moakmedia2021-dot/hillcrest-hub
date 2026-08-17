@@ -36,7 +36,7 @@ export default function RosterPage() {
   const router = useRouter();
 
   const sundays = useMemo(() => upcomingSundays(8), []);
-  const departments = allDepartments(data.members);
+  const departments = allDepartments(data);
 
   const [date, setDate] = useState(sundays[0]);
   const [dept, setDept] = useState(user?.department ?? departments[0] ?? "Creative");

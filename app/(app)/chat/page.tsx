@@ -768,7 +768,7 @@ function NewChatModal({
               className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-brand"
             >
               <option value="">None — just the people I pick</option>
-              {allDepartments(data.members).map((d) => (
+              {allDepartments(data).map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
